@@ -1,0 +1,76 @@
+Commodities Retail Sentiment Dashboard - UI Naming Map (Updated)
+
+Page-Level
+- Page title (COMMODITIES SENTIMENT page): "Commodities Retail Sentiment Dashboard"
+- Subtitle/caption: sentence under the title explaining pytrends / commodity sentiment proxy
+
+Sidebar (left) - Navigation Menu
+- Sidebar menu (entire sidebar navigation area)
+- Menu title: "MENU"
+- Menu items (radio navigation options)
+- Menu item: HOME
+- Menu item: INVESTMENTS
+- Menu item: COMMODITIES SENTIMENT
+- Active menu item (currently selected page)
+
+HOME Page
+- Home page title: "HOME"
+- Home page caption
+- Home placeholder info box
+
+INVESTMENTS Page
+- Investments page title: "INVESTMENTS"
+- Investments page caption
+- Investments placeholder info box
+
+COMMODITIES SENTIMENT Page - Top Summary
+- Current Interest Levels section (the whole panel above chart)
+- Interest Levels panel (row/grid container)
+- Interest card (one commodity tile/card)
+- Card divider / Vertical divider (line between cards)
+- Commodity name (e.g. Gold, Silver)
+- Interest value (main numeric value)
+- Momentum delta (green/red number to the right of interest value)
+
+COMMODITIES SENTIMENT Page - Main Chart Area
+- Interest Over Time chart (line chart)
+- Chart title ("Google Trends Interest Over Time (Commodities)")
+- Plot area (graph body)
+- X-axis (Date)
+- Y-axis (Interest)
+- Legend (commodity color labels)
+- Line series (Gold line, Silver line, etc.)
+- Hover tooltip / hover labels
+
+COMMODITIES SENTIMENT Page - Filter Row (below chart)
+- Filter row (container below Interest Over Time chart)
+- Time range dropdown
+- Geo (country code) input
+- Geo placeholder hint ("e.g. US")
+- Commodities multiselect
+
+Bottom
+- Footer note / Normalization note (caption about Google Trends 0-100 normalization)
+
+Example phrasing (recommended)
+- "Increase Sidebar menu title size"
+- "Make active Menu item more prominent"
+- "Move Filter row closer to the Interest Over Time chart"
+- "Change Geo placeholder hint color"
+- "Increase Interest card > Commodity name font size"
+- "Make Card dividers darker"
+- "Align Momentum delta with Interest value baseline"
+
+Best way to give UI instructions
+Use this format:
+- Element: what you want changed
+- Change: exact adjustment
+- Scope: desktop / mobile / both
+
+Example
+- Element: Sidebar menu > Menu item (active)
+- Change: increase font size and add bold weight
+- Scope: both
+
+Optional deeper reference
+- I can also provide a designer shorthand map tied to the actual CSS class names / Streamlit widgets in app.py (e.g. .interest-name, .interest-value, .interest-card, sidebar radio labels).
