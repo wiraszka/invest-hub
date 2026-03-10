@@ -3,3 +3,6 @@ ws-statement-parser.ipynb
 ws-statement-tests.py
 .venv
 ws-statement-parser-checkpoint.ipynb
+.DS_Store
+.ipynb_checkpoints
+__pycache__
