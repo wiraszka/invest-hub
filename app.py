@@ -15,6 +15,28 @@ COMMODITIES: Dict[str, str] = {
     "Platinum": "platinum",
     "Copper": "copper",
     "Uranium": "uranium",
+    "Lithium": "lithium",
+    "Nickel": "nickel",
+    "Phosphate": "phosphate",
+    "Graphite": "graphite",
+    "Zinc": "zinc",
+    "Antimony": "antimony",
+}
+
+DEFAULT_COMMODITIES = ["Gold", "Silver", "Platinum", "Copper", "Uranium"]
+
+COMMODITY_COLOR_MAP = {
+    "Gold": "#D4AF37",
+    "Silver": "#C0C0C0",
+    "Platinum": "#9FA7B2",
+    "Copper": "#B87333",
+    "Uranium": "#6B8E23",
+    "Lithium": "#4F86C6",
+    "Nickel": "#6E7F80",
+    "Phosphate": "#7EA04D",
+    "Graphite": "#4A4A4A",
+    "Zinc": "#7D8CA3",
+    "Antimony": "#A67C52",
 }
 
 TIMEFRAME_OPTIONS = {
@@ -209,23 +231,32 @@ def render_investments_page() -> None:
 
 def render_commodities_sentiment_page() -> None:
     st.title("Commodities Retail Sentiment Dashboard")
-    st.caption(
-        "Uses Google Trends search interest (via pytrends) as a retail sentiment proxy for commodities: Gold, Silver, Platinum, Copper, and Uranium."
-    )
+    
 
     if "ms_timeframe" not in st.session_state:
         st.session_state.ms_timeframe = list(TIMEFRAME_OPTIONS.keys())[0]
     if "ms_geo" not in st.session_state:
         st.session_state.ms_geo = ""
     if "ms_selected_commodities" not in st.session_state:
-        st.session_state.ms_selected_commodities = list(COMMODITIES.keys())
+        st.session_state.ms_selected_commodities = DEFAULT_COMMODITIES.copy()
+    if "ms_applied_timeframe" not in st.session_state:
+        st.session_state.ms_applied_timeframe = st.session_state.ms_timeframe
+    if "ms_applied_geo" not in st.session_state:
+        st.session_state.ms_applied_geo = st.session_state.ms_geo
+    if "ms_applied_selected_commodities" not in st.session_state:
+        st.session_state.ms_applied_selected_commodities = st.session_state.ms_selected_commodities.copy()
 
-    timeframe_label = st.session_state.ms_timeframe
-    geo = st.session_state.ms_geo
-    selected_commodities = st.session_state.ms_selected_commodities
+    def apply_commodity_filters() -> None:
+        st.session_state.ms_applied_timeframe = st.session_state.ms_timeframe
+        st.session_state.ms_applied_geo = st.session_state.ms_geo
+        st.session_state.ms_applied_selected_commodities = st.session_state.ms_selected_commodities.copy()
+
+    timeframe_label = st.session_state.ms_applied_timeframe
+    geo = st.session_state.ms_applied_geo
+    selected_commodities = st.session_state.ms_applied_selected_commodities
 
     if not selected_commodities:
-        st.warning("Select at least one commodity in the filters below.")
+        st.warning("Select at least one commodity in the filters below, then refresh the chart.")
     else:
         keywords = [COMMODITIES[c] for c in selected_commodities]
 
@@ -264,19 +295,23 @@ def render_commodities_sentiment_page() -> None:
                 y="Interest",
                 color="Commodity",
                 title="Google Trends Interest Over Time (Commodities)",
+                color_discrete_map=COMMODITY_COLOR_MAP,
             )
             fig.update_layout(legend_title_text="Commodity", hovermode="x unified")
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("No trend data returned for the selected settings.")
 
-    controls_col1, controls_col2, controls_col3 = st.columns([1.3, 1.0, 2.3])
+    controls_col1, controls_col2, controls_col3, controls_col4 = st.columns([1.3, 1.0, 2.3, 0.9])
     with controls_col1:
         st.selectbox("Time range", list(TIMEFRAME_OPTIONS.keys()), key="ms_timeframe")
     with controls_col2:
         st.text_input("Geo (country code)", key="ms_geo", placeholder="e.g. US")
     with controls_col3:
         st.multiselect("Commodities", list(COMMODITIES.keys()), key="ms_selected_commodities")
+    with controls_col4:
+        st.write("")
+        st.button("Refresh", on_click=apply_commodity_filters, use_container_width=True)
 
     st.caption("Note: Google Trends values are normalized (0-100) relative to the selected timeframe and comparison set.")
 
