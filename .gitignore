@@ -6,3 +6,8 @@ ws-statement-parser-checkpoint.ipynb
 .DS_Store
 .ipynb_checkpoints
 __pycache__
+/scripts/donut_frames
+/sec-downloader/SEC_Filings
+/ws-statement-parser/FHSA-monthly-statement-transactions-HQ8KYPT67CAD-2026-01-01.csv
+/scripts/.donut_chart_load_animation.ipynb.layout
+/scripts/donut_chart_load_animation.ipynb
