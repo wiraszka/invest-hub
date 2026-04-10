@@ -1,0 +1,11 @@
+
+.DS_Store
+*.ipynb_checkpoints
+*.ipynb
+*.txt
+!requirements.txt
+.env
+__pycache__
+.venv
+/visualization-scripts/donut_frames
+/fetch-price-data/*.csv
