@@ -1,4 +1,5 @@
 
+# General
 .DS_Store
 *.ipynb_checkpoints
 *.ipynb
@@ -7,5 +8,19 @@
 .env
 __pycache__
 .venv
-/visualization-scripts/donut_frames
-/fetch-price-data/*.csv
+
+# Backend
+/backend/LLM-prompts/
+/backend/visualization-scripts/donut_frames
+/backend/sec-csa-downloader/companies
+/backend/ws-statement-parser/ws-statements
+/backend/fetch-price-data/price-data-1yr
+/backend/fetch-price-data/live-commodity-prices
+/backend/fetch-price-data/*.csv
+
+# Frontend
+/frontend/.next/
+/frontend/node_modules/
+
+# Project docs
+PROJECT_OUTLINE.md
