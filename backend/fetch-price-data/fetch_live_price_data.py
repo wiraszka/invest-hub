@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
-import requests
-import pandas as pd
+
 import matplotlib.pyplot as plt
+import pandas as pd
+import requests
 from dotenv import load_dotenv
 from twelvedata import TDClient
 

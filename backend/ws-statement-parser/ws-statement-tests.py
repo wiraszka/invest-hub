@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 MODULE_PATH = Path(__file__).with_name("ws-statement-parser.py")
 SPEC = importlib.util.spec_from_file_location("ws_statement_parser", MODULE_PATH)
 ws_statement_parser = importlib.util.module_from_spec(SPEC)

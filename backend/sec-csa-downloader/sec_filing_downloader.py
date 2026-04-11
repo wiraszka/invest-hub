@@ -1,8 +1,9 @@
-from pathlib import Path
 import re
 import time
-import requests
+from pathlib import Path
+
 import pandas as pd
+import requests
 
 # -------- INPUTS -----------
 
