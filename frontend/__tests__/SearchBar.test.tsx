@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 
 jest.mock("next/navigation", () => ({
@@ -26,13 +27,18 @@ describe("SearchBar", () => {
   it("renders the input field", () => {
     render(<SearchBar />);
 
-    expect(screen.getByPlaceholderText("Search ticker or company...")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Search ticker or company..."),
+    ).toBeInTheDocument();
   });
 
   it("shows results after typing", async () => {
     render(<SearchBar />);
 
-    await userEvent.type(screen.getByPlaceholderText("Search ticker or company..."), "A");
+    await userEvent.type(
+      screen.getByPlaceholderText("Search ticker or company..."),
+      "A",
+    );
 
     await waitFor(() => {
       expect(screen.getByText("AAPL")).toBeInTheDocument();
@@ -42,12 +48,21 @@ describe("SearchBar", () => {
 
   it("navigates to company page on selection", async () => {
     const mockPush = jest.fn();
-    const { useRouter } = require("next/navigation");
-    (useRouter as jest.Mock).mockReturnValue({ push: mockPush });
+    jest.mocked(useRouter).mockReturnValue({
+      push: mockPush,
+      back: jest.fn(),
+      forward: jest.fn(),
+      refresh: jest.fn(),
+      replace: jest.fn(),
+      prefetch: jest.fn(),
+    } as ReturnType<typeof useRouter>);
 
     render(<SearchBar />);
 
-    await userEvent.type(screen.getByPlaceholderText("Search ticker or company..."), "A");
+    await userEvent.type(
+      screen.getByPlaceholderText("Search ticker or company..."),
+      "A",
+    );
 
     await waitFor(() => screen.getByText("AAPL"));
 

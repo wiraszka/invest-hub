@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import {
-  LineChart,
+  CartesianGrid,
   Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
 } from "recharts";
 
 interface PricePoint {
@@ -16,22 +16,29 @@ interface PricePoint {
   close: number;
 }
 
+interface State {
+  price: number | null;
+  history: PricePoint[];
+  error: string | null;
+  loading: boolean;
+}
+
+const INITIAL_STATE: State = {
+  price: null,
+  history: [],
+  error: null,
+  loading: true,
+};
+
 interface Props {
   ticker: string;
 }
 
 export default function PriceSection({ ticker }: Props) {
-  const [price, setPrice] = useState<number | null>(null);
-  const [history, setHistory] = useState<PricePoint[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<State>(INITIAL_STATE);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    setPrice(null);
-    setHistory([]);
-
+    let cancelled = false;
     const base = process.env.NEXT_PUBLIC_BACKEND_URL;
 
     Promise.all([
@@ -39,20 +46,38 @@ export default function PriceSection({ ticker }: Props) {
       fetch(`${base}/api/price/${ticker}/history`).then((r) => r.json()),
     ])
       .then(([priceData, historyData]) => {
+        if (cancelled) return;
         if (priceData.price === undefined) {
-          setError(priceData.detail ?? "Failed to load price");
+          setState((s) => ({
+            ...s,
+            error: priceData.detail ?? "Failed to load price",
+            loading: false,
+          }));
         } else {
-          setPrice(priceData.price);
-        }
-        if (historyData.history) {
-          setHistory(historyData.history);
+          setState((s) => ({
+            ...s,
+            price: priceData.price,
+            history: historyData.history ?? [],
+            loading: false,
+          }));
         }
       })
-      .catch(() => setError("Failed to load price data"))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!cancelled) {
+          setState((s) => ({
+            ...s,
+            error: "Failed to load price data",
+            loading: false,
+          }));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [ticker]);
 
-  if (loading) {
+  if (state.loading) {
     return (
       <div className="mb-8">
         <div className="h-8 w-48 bg-neutral-800 rounded animate-pulse mb-2" />
@@ -62,29 +87,28 @@ export default function PriceSection({ ticker }: Props) {
     );
   }
 
-  if (error) {
-    return (
-      <div className="mb-8 text-center text-red-400">{error}</div>
-    );
+  if (state.error) {
+    return <div className="mb-8 text-center text-red-400">{state.error}</div>;
   }
 
   return (
     <div className="mb-8">
       <h1 className="text-3xl font-bold text-white mb-1">{ticker}</h1>
-      {price !== null && (
+      {state.price !== null && (
         <p className="text-2xl font-semibold text-neutral-300 mb-6">
-          ${price.toFixed(2)} <span className="text-sm text-neutral-500">USD</span>
+          ${state.price.toFixed(2)}{" "}
+          <span className="text-sm text-neutral-500">USD</span>
         </p>
       )}
-      {history.length > 0 && (
+      {state.history.length > 0 && (
         <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={history}>
+          <LineChart data={state.history}>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
             <XAxis
               dataKey="date"
               tick={{ fill: "#737373", fontSize: 11 }}
               tickFormatter={(v) => v.slice(5)}
-              interval={Math.floor(history.length / 6)}
+              interval={Math.floor(state.history.length / 6)}
             />
             <YAxis
               tick={{ fill: "#737373", fontSize: 11 }}
@@ -93,7 +117,11 @@ export default function PriceSection({ ticker }: Props) {
               width={56}
             />
             <Tooltip
-              contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6 }}
+              contentStyle={{
+                background: "#171717",
+                border: "1px solid #404040",
+                borderRadius: 6,
+              }}
               labelStyle={{ color: "#a3a3a3", fontSize: 12 }}
               itemStyle={{ color: "#e5e5e5" }}
               formatter={(v) => [`$${Number(v).toFixed(2)}`, "Close"]}
