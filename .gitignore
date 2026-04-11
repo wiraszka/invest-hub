@@ -5,6 +5,7 @@
 *.ipynb
 *.txt
 !requirements.txt
+!requirements-dev.txt
 .env
 __pycache__
 .venv
