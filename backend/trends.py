@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import List
 
 import pandas as pd
-from pytrends.request import TrendReq
 import streamlit as st
+from pytrends.request import TrendReq
 
 from constants import TIMEFRAME_OPTIONS
 

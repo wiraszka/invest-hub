@@ -226,7 +226,6 @@ def plot_revenue_by_segment(
     if not revenue_by_segment:
         raise ValueError("Revenue by segment chart requires a non-empty revenue_by_segment dict.")
 
-    labels = list(revenue_by_segment.keys())
     values = list(revenue_by_segment.values())
 
     _safe_show(values, "Revenue by Segment")

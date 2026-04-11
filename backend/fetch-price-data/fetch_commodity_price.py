@@ -1,6 +1,9 @@
-import pandas as pd
 from pathlib import Path
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+
+import pandas as pd
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import async_playwright
+
 
 async def scrape_te_commodities_debug():
     url = "https://tradingeconomics.com/commodities"

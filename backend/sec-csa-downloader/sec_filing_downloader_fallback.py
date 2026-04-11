@@ -1,8 +1,9 @@
+import re
 from pathlib import Path
 from urllib.parse import urljoin
-import re
-import requests
+
 import pandas as pd
+import requests
 from bs4 import BeautifulSoup
 from edgar import Company, set_identity
 

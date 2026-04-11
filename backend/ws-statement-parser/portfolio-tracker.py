@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 PARSER_PATH = Path(__file__).with_name("ws-statement-parser.py")
 
 OUTPUT_COLUMNS = [

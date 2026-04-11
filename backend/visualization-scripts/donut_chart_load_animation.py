@@ -1,10 +1,10 @@
-from pathlib import Path
 import shutil
 import subprocess
-import numpy as np
+from pathlib import Path
+
+import imageio_ffmpeg
 import matplotlib.pyplot as plt
 from matplotlib.patches import Wedge
-import imageio_ffmpeg
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 

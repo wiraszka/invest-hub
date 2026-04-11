@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 STATEMENTS_DIR = Path("ws-statements")
 CSV_PATH = STATEMENTS_DIR / "TFSA-monthly-statement-transactions-HQ8GXMMK0CAD-2025-07-01.csv"
 
