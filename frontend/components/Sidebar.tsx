@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
+import SearchBar from "@/components/SearchBar";
 
 const NAV_ITEMS = [
   { label: "HOME", href: "/" },
@@ -19,6 +20,8 @@ export default function Sidebar() {
       <div className="text-2xl font-extrabold tracking-wide text-white mb-8">
         invest-hub
       </div>
+
+      <SearchBar />
 
       <nav className="flex flex-col gap-1 flex-1">
         {NAV_ITEMS.map((item) => {

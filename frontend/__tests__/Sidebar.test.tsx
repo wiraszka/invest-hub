@@ -8,6 +8,7 @@ jest.mock("@clerk/nextjs", () => ({
 
 jest.mock("next/navigation", () => ({
   usePathname: jest.fn(),
+  useRouter: jest.fn(() => ({ push: jest.fn() })),
 }));
 
 import { usePathname } from "next/navigation";
