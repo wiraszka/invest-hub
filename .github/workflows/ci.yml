@@ -23,7 +23,7 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install fastapi uvicorn httpx pytest pytest-asyncio ruff
+        run: pip install -r requirements.txt
 
       - name: Lint with ruff
         run: ruff check .
