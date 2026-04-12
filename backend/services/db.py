@@ -12,39 +12,61 @@ load_dotenv()
 _mongo_client: MongoClient | None = None
 
 
-def _collection() -> Collection:
+def _db():
     global _mongo_client
     uri = os.environ.get("MONGODB_URI", "")
     if not uri:
         raise RuntimeError("MONGODB_URI is not set")
     if _mongo_client is None:
         _mongo_client = MongoClient(uri)
-    return _mongo_client["invest-hub"]["analyses"]
+    return _mongo_client["invest-hub"]
+
+
+def _collection() -> Collection:
+    return _db()["analyses"]
+
+
+# ---------------------------------------------------------------------------
+# Prompts
+# ---------------------------------------------------------------------------
 
 
 def get_prompt(company_type: str) -> str | None:
-    col = _collection().database["prompts"]
-    doc = col.find_one({"type": company_type}, {"_id": 0, "content": 1})
+    doc = _db()["prompts"].find_one({"type": company_type}, {"_id": 0, "content": 1})
     return doc["content"] if doc else None
 
 
 def upsert_prompt(company_type: str, content: str) -> None:
-    col = _collection().database["prompts"]
-    col.update_one(
+    _db()["prompts"].update_one(
         {"type": company_type},
         {"$set": {"type": company_type, "content": content}},
         upsert=True,
     )
 
 
-def upsert_analysis(ticker: str, company_type: str, markdown: str) -> None:
+# ---------------------------------------------------------------------------
+# Analyses
+# ---------------------------------------------------------------------------
+
+
+def upsert_analysis(
+    ticker: str,
+    company_type: str,
+    snapshot: str,
+    chart_data: dict,
+    xbrl_data: dict,
+    market_cap_usd: float | None,
+) -> None:
     _collection().update_one(
         {"ticker": ticker},
         {
             "$set": {
                 "ticker": ticker,
                 "company_type": company_type,
-                "markdown": markdown,
+                "market_cap_usd": market_cap_usd,
+                "snapshot": snapshot,
+                "chart_data": chart_data,
+                "xbrl_data": xbrl_data,
                 "updated_at": datetime.now(timezone.utc),
             }
         },
