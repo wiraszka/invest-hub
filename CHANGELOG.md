@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.3.0] - 2026-04-12
+
+### Changed
+
+- Refactor LLM analysis pipeline: replace single monolithic call with two focused calls (Haiku for classification + chart JSON extraction, Sonnet for Company Snapshot prose)
+- Extract only relevant 10-K sections (Item 1, 1A, 7) instead of full document, reducing input from 100k to ~24k chars
+- Replace LLM-generated charts with structured data pipeline: XBRL API for standard financials, targeted LLM extraction for industry-specific fields
+- Store `snapshot`, `chart_data`, `xbrl_data`, and `market_cap_usd` as discrete fields instead of a single markdown blob
+- Derive market cap from XBRL shares outstanding × live TwelveData price
+- Derive cash burn for pre-revenue companies from XBRL operating cash flow
+
+### Added
+
+- `services/sec.py`: section extractor for 10-K Items 1/1A/7 and XBRL structured financial facts fetcher
+- `tests/test_sec.py`: 7 tests covering CIK resolution, section extraction, and XBRL parsing
+
 ## [v1.2.1] - 2026-04-12
 
 ### Changed
