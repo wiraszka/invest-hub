@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import anthropic
 from dotenv import load_dotenv
 
+from services.db import get_prompt
+
 load_dotenv()
 
-PROMPTS_DIR = Path(__file__).parent.parent / "LLM-prompts"
 MODEL = "claude-opus-4-6"
 MAX_TOKENS = 8000
 
@@ -46,11 +46,10 @@ def classify_company(filing_text: str) -> str:
 
 
 def run_analysis(ticker: str, company_type: str, filing_text: str) -> str:
-    prompt_path = PROMPTS_DIR / company_type
-    if not prompt_path.exists():
-        raise ValueError(f"No prompt found for company type: {company_type}")
+    system_prompt = get_prompt(company_type)
+    if system_prompt is None:
+        raise ValueError(f"No prompt found in database for company type: {company_type}")
 
-    system_prompt = prompt_path.read_text()
     message = _client().messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
