@@ -22,6 +22,21 @@ def _collection() -> Collection:
     return _mongo_client["invest-hub"]["analyses"]
 
 
+def get_prompt(company_type: str) -> str | None:
+    col = _collection().database["prompts"]
+    doc = col.find_one({"type": company_type}, {"_id": 0, "content": 1})
+    return doc["content"] if doc else None
+
+
+def upsert_prompt(company_type: str, content: str) -> None:
+    col = _collection().database["prompts"]
+    col.update_one(
+        {"type": company_type},
+        {"$set": {"type": company_type, "content": content}},
+        upsert=True,
+    )
+
+
 def upsert_analysis(ticker: str, company_type: str, markdown: str) -> None:
     _collection().update_one(
         {"ticker": ticker},
