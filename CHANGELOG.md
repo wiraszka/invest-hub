@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.2.0] - 2026-04-12
+
+### Added
+
+- Add SEC EDGAR 10-K fetching and text extraction for any ticker
+- Add LLM pre-classification and full company analysis pipeline powered by Claude
+- Store and retrieve analysis results in MongoDB
+- Add `POST /api/analysis/{ticker}` and `GET /api/analysis/{ticker}` endpoints
+
 ## [v1.1.0] - 2026-04-11
 
 ### Added
