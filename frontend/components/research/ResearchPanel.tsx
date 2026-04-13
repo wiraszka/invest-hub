@@ -61,8 +61,10 @@ function fmtShort(value: number): string {
 
 const CHART_COLORS = ["#60a5fa", "#f87171", "#34d399", "#fbbf24", "#a78bfa"];
 
-function fmtValue(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || typeof value === "string")
+function fmtValue(
+  value: number | string | readonly (string | number)[] | null | undefined,
+): string {
+  if (value === null || value === undefined || typeof value !== "number")
     return "—";
   return fmt(value);
 }
