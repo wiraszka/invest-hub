@@ -17,7 +17,7 @@ def _load_tickers() -> dict:
     return _cache
 
 
-def search_companies(query: str, limit: int = 5) -> list[dict]:
+def search_companies(query: str, limit: int = 10) -> list[dict]:
     """
     Search SEC company tickers by ticker symbol or company name.
     Returns up to `limit` results, each with ticker, name, and cik.

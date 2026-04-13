@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 interface SearchResult {
@@ -9,13 +8,16 @@ interface SearchResult {
   cik: string;
 }
 
-export default function SearchBar() {
+interface Props {
+  onSelect: (ticker: string, name: string) => void;
+}
+
+export default function ResearchSearchBar({ onSelect }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -63,30 +65,36 @@ export default function SearchBar() {
     setQuery("");
     setResults([]);
     setOpen(false);
-    router.push(`/company/${result.ticker}`);
+    onSelect(result.ticker, result.name);
   }
 
   return (
-    <div ref={containerRef} className="relative mb-6">
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search ticker or company..."
-        className="w-full rounded-md bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 outline-none focus:ring-1 focus:ring-neutral-600"
-      />
-      {loading && (
-        <div className="absolute right-3 top-2.5 text-xs text-neutral-500">
-          ...
-        </div>
-      )}
+    <div ref={containerRef} className="relative w-full">
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search ticker or company name..."
+          className="flex-1 rounded-md bg-neutral-800 px-4 py-3 text-sm text-neutral-100 placeholder-neutral-500 outline-none focus:ring-1 focus:ring-neutral-600"
+        />
+        {loading && (
+          <span className="text-xs text-neutral-500 shrink-0">
+            Searching...
+          </span>
+        )}
+      </div>
       {open && results.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full overflow-y-auto rounded-md border border-neutral-700 bg-neutral-900 shadow-lg max-h-48">
+        <ul
+          role="listbox"
+          className="absolute z-50 mt-1 w-full overflow-y-auto rounded-md border border-neutral-700 bg-neutral-900 shadow-lg"
+          style={{ maxHeight: "calc(5 * 44px)" }}
+        >
           {results.map((result) => (
             <li key={result.cik}>
               <button
                 onClick={() => handleSelect(result)}
-                className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm hover:bg-neutral-800"
+                className="flex w-full items-baseline gap-2 px-4 py-2.5 text-left text-sm hover:bg-neutral-800"
               >
                 <span className="font-semibold text-neutral-100">
                   {result.ticker}
