@@ -61,6 +61,12 @@ function fmtShort(value: number): string {
 
 const CHART_COLORS = ["#60a5fa", "#f87171", "#34d399", "#fbbf24", "#a78bfa"];
 
+function fmtValue(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || typeof value === "string")
+    return "—";
+  return fmt(value);
+}
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4">
@@ -159,7 +165,7 @@ export default function ResearchPanel({ data }: Props) {
                 width={80}
               />
               <Tooltip
-                formatter={(v: number) => fmt(v)}
+                formatter={(v) => fmtValue(v)}
                 contentStyle={{
                   background: "#171717",
                   border: "1px solid #404040",
@@ -212,7 +218,7 @@ export default function ResearchPanel({ data }: Props) {
                 cy="50%"
                 outerRadius={80}
                 label={({ name, percent }) =>
-                  `${name} ${(percent * 100).toFixed(0)}%`
+                  `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
                 }
                 labelLine={false}
               >
@@ -221,7 +227,7 @@ export default function ResearchPanel({ data }: Props) {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(v: number) => fmt(v)}
+                formatter={(v) => fmtValue(v)}
                 contentStyle={{
                   background: "#171717",
                   border: "1px solid #404040",
