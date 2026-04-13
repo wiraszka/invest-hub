@@ -10,6 +10,6 @@ router = APIRouter()
 @router.get("/api/search")
 def search(q: str = Query(..., min_length=1)) -> list[dict]:
     try:
-        return search_companies(q, limit=5)
+        return search_companies(q, limit=10)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
