@@ -7,8 +7,6 @@ import re
 import anthropic
 from dotenv import load_dotenv
 
-from services.db import get_prompt
-
 load_dotenv()
 
 CLASSIFY_MODEL = "claude-haiku-4-5-20251001"
@@ -41,6 +39,24 @@ Rules:
 - cash_burn: populate only for pre-revenue companies if quarterly or annual cash burn is disclosed. Format: {"annual_burn_usd": <number>}. Set to null otherwise.
 
 Respond with only the JSON object. No explanation, no markdown."""
+
+_SNAPSHOT_PROMPT = """You are a financial analyst writing a Company Snapshot for an investment research platform.
+
+Based on the annual filing excerpt provided, write a concise Company Snapshot of 5–7 bullet points. Each bullet must be a single, factual sentence.
+
+Cover the following where relevant:
+- What the company does and its primary business
+- Where it operates (geography, markets, or key assets)
+- Key products, services, commodities, or projects
+- Financial stage (revenue-generating, pre-revenue, or notable financial characteristics)
+- Notable risks, competitive position, or recent developments
+
+Rules:
+- Use present tense
+- Be factual and concise — no opinions, target prices, or buy/sell recommendations
+- Start each bullet with "- "
+- Do not include headers, section titles, or introductory text
+- Do not repeat information across bullets"""
 
 _MERGER_NOTICE = (
     "\n\n---\n**Note:** Filing content suggests this company may have been acquired, "
@@ -106,17 +122,11 @@ def generate_snapshot(
     Returns the Company Snapshot markdown string.
     Appends a merger/acquisition notice if company_independence is not "independent".
     """
-    system_prompt = get_prompt(company_type)
-    if system_prompt is None:
-        raise ValueError(
-            f"No prompt found in database for company type: {company_type}"
-        )
-
     client = _client()
     message = client.messages.create(
         model=SNAPSHOT_MODEL,
         max_tokens=1024,
-        system=system_prompt,
+        system=_SNAPSHOT_PROMPT,
         messages=[
             {
                 "role": "user",
