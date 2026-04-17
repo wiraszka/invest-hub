@@ -142,7 +142,9 @@ def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
     raw = resp.json()
 
     is_20f = form_type in ("20-F", "20-F/A")
-    annual_forms = {form_type, form_type.rstrip("/A")} if "/" in form_type else {form_type}
+    annual_forms = (
+        {form_type, form_type.rstrip("/A")} if "/" in form_type else {form_type}
+    )
     # Always accept both the exact form and its non-amended equivalent
     annual_forms = {"10-K", "20-F"} if is_20f else {"10-K", "10-K/A"}
 
@@ -158,7 +160,7 @@ def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
 
     # For 20-F filers where us-gaap is empty or sparse, try ifrs-full
     if is_20f and all(v is None for v in result.values()):
-        from services.sec_20f import IFRS_XBRL_FACTS, get_ifrs_xbrl_facts
+        from services.sec_20f import get_ifrs_xbrl_facts
 
         ifrs_result, ifrs_currency = get_ifrs_xbrl_facts(raw, annual_forms)
         result = ifrs_result
@@ -167,7 +169,9 @@ def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
     # Derive net_debt
     cash = result.get("cash")
     debt = result.get("total_debt")
-    result["net_debt"] = (debt - cash) if cash is not None and debt is not None else None
+    result["net_debt"] = (
+        (debt - cash) if cash is not None and debt is not None else None
+    )
 
     return result, reporting_currency
 

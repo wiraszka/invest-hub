@@ -8,6 +8,7 @@ from services.db import get_analysis, upsert_analysis
 from services.llm import classify_and_extract, generate_snapshot
 from services.price import get_current_price
 from services.sec import (
+    extract_10k_sections,
     fetch_filing_text,
     find_recent_annual,
     get_submissions,
@@ -16,7 +17,6 @@ from services.sec import (
     resolve_cik,
 )
 from services.sec_20f import extract_20f_sections
-from services.sec import extract_10k_sections
 
 SNAPSHOT_MODEL = "claude-sonnet-4-6"
 LLM_KNOWLEDGE_CUTOFF = "August 2025"
@@ -78,7 +78,9 @@ def trigger_analysis(ticker: str = Path(...)) -> dict:
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch SEC submissions: {e}")
+        raise HTTPException(
+            status_code=502, detail=f"Failed to fetch SEC submissions: {e}"
+        )
 
     # ------------------------------------------------------------------
     # Step 3 — Filing recency check (warning only, does not abort)

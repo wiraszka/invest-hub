@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 20-F filing support: section extraction and IFRS XBRL fact retrieval.
 
@@ -9,9 +7,11 @@ from __future__ import annotations
   - Item 5  "Operating and Financial..."  ≈ 10-K Item 7  (MD&A)
 """
 
+from __future__ import annotations
+
 import re
 
-from services.sec import MAX_FILING_CHARS, MAX_SECTION_CHARS, _extract_sections
+from services.sec import _extract_sections
 
 _SECTION_PATTERNS_20F = [
     re.compile(r"item\s+4\.?\s+information\s+on\s+the\s+company", re.I),
@@ -55,9 +55,7 @@ def extract_20f_sections(text: str) -> str:
     return _extract_sections(text, _SECTION_PATTERNS_20F)
 
 
-def get_ifrs_xbrl_facts(
-    raw_facts: dict, annual_forms: set[str]
-) -> tuple[dict, str]:
+def get_ifrs_xbrl_facts(raw_facts: dict, annual_forms: set[str]) -> tuple[dict, str]:
     """
     Extract financial facts from the ifrs-full XBRL namespace.
     Returns (facts_dict, reporting_currency).

@@ -44,6 +44,18 @@ const BASE_DATA: AnalysisData = {
     net_debt: 50_000_000_000,
   },
   market_cap_usd: 3_000_000_000_000,
+  data_integrity: {
+    filing_type: "10-K",
+    filing_date: "2025-11-01",
+    filing_recency: "fresh",
+    reporting_currency: "USD",
+    xbrl_quality: "full",
+    sections_extracted: true,
+    company_independence: "independent",
+    llm_model: "claude-sonnet-4-6",
+    llm_knowledge_cutoff: "August 2025",
+    analysis_timestamp: "2026-04-13T00:00:00Z",
+  },
   updated_at: "2026-04-13T00:00:00+00:00",
 };
 
