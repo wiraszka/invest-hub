@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from services.llm import classify_and_extract, generate_snapshot
 
 MOCK_FILING = "This is a 10-K filing excerpt for a revenue-generating software company."
@@ -61,10 +59,7 @@ def test_classify_and_extract_handles_json_in_prose():
 
 
 def test_generate_snapshot_returns_prose():
-    with (
-        patch("services.llm.get_prompt", return_value=MOCK_PROMPT),
-        patch("services.llm._client") as mock_client,
-    ):
+    with patch("services.llm._client") as mock_client:
         mock_client.return_value.messages.create.return_value = _mock_message(
             MOCK_SNAPSHOT
         )
@@ -72,9 +67,3 @@ def test_generate_snapshot_returns_prose():
         result = generate_snapshot("AAPL", "revenue-generating", MOCK_FILING)
 
     assert result == MOCK_SNAPSHOT
-
-
-def test_generate_snapshot_raises_when_prompt_missing():
-    with patch("services.llm.get_prompt", return_value=None):
-        with pytest.raises(ValueError, match="No prompt found"):
-            generate_snapshot("AAPL", "revenue-generating", MOCK_FILING)

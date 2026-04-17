@@ -27,24 +27,6 @@ def _collection() -> Collection:
 
 
 # ---------------------------------------------------------------------------
-# Prompts
-# ---------------------------------------------------------------------------
-
-
-def get_prompt(company_type: str) -> str | None:
-    doc = _db()["prompts"].find_one({"type": company_type}, {"_id": 0, "content": 1})
-    return doc["content"] if doc else None
-
-
-def upsert_prompt(company_type: str, content: str) -> None:
-    _db()["prompts"].update_one(
-        {"type": company_type},
-        {"$set": {"type": company_type, "content": content}},
-        upsert=True,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Analyses
 # ---------------------------------------------------------------------------
 
