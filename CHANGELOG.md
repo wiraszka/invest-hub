@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.6.3] - 2026-04-16
+
+### Fixed
+
+- Fetch the Annual Information Form (EX-99.1) from 40-F filings instead of the thin cover document — the primary document contains only metadata, so section extraction was returning nothing and the LLM had no filing context for Canadian MJDS filers (e.g. AEM)
+
 ## [v1.6.2] - 2026-04-17
 
 ### Added
@@ -113,6 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.6.3]: https://github.com/wiraszka/invest-hub/compare/v1.6.2...v1.6.3
 [v1.6.2]: https://github.com/wiraszka/invest-hub/compare/v1.6.1...v1.6.2
 [v1.6.1]: https://github.com/wiraszka/invest-hub/compare/v1.6.0...v1.6.1
 [v1.6.0]: https://github.com/wiraszka/invest-hub/compare/v1.5.0...v1.6.0
