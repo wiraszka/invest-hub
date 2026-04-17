@@ -3,7 +3,9 @@ from pathlib import Path
 import pandas as pd
 
 STATEMENTS_DIR = Path("ws-statements")
-CSV_PATH = STATEMENTS_DIR / "TFSA-monthly-statement-transactions-HQ8GXMMK0CAD-2025-07-01.csv"
+CSV_PATH = (
+    STATEMENTS_DIR / "TFSA-monthly-statement-transactions-HQ8GXMMK0CAD-2025-07-01.csv"
+)
 
 BUY_SELL_PATTERN = (
     r"^(?P<ticker>.+?) - "
@@ -88,18 +90,26 @@ def remove_non_transactions(statement_df: pd.DataFrame) -> pd.DataFrame:
 
 def parse_trade_descriptions(statement_df: pd.DataFrame) -> pd.DataFrame:
     parsed_df = statement_df.copy()
-    extracted_fields = parsed_df["description"].where(
-        parsed_df["transaction"].isin(["BUY", "SELL"])
-    ).str.extract(BUY_SELL_PATTERN)
+    extracted_fields = (
+        parsed_df["description"]
+        .where(parsed_df["transaction"].isin(["BUY", "SELL"]))
+        .str.extract(BUY_SELL_PATTERN)
+    )
 
-    parsed_df["ticker"] = extracted_fields["ticker"].combine_first(_existing_column(parsed_df, "ticker"))
-    parsed_df["company_name"] = extracted_fields["company_name"].combine_first(_existing_column(parsed_df, "company_name"))
-    parsed_df["type"] = extracted_fields["order_type"].combine_first(_existing_column(parsed_df, "type"))
+    parsed_df["ticker"] = extracted_fields["ticker"].combine_first(
+        _existing_column(parsed_df, "ticker")
+    )
+    parsed_df["company_name"] = extracted_fields["company_name"].combine_first(
+        _existing_column(parsed_df, "company_name")
+    )
+    parsed_df["type"] = extracted_fields["order_type"].combine_first(
+        _existing_column(parsed_df, "type")
+    )
     parsed_df["share_count"] = pd.to_numeric(extracted_fields["share_count"])
     parsed_df["price"] = pd.to_numeric(extracted_fields["price"])
-    parsed_df["execution_date"] = pd.to_datetime(extracted_fields["execution_date"]).combine_first(
-        _existing_column(parsed_df, "execution_date")
-    )
+    parsed_df["execution_date"] = pd.to_datetime(
+        extracted_fields["execution_date"]
+    ).combine_first(_existing_column(parsed_df, "execution_date"))
     parsed_df["fx_rate"] = pd.to_numeric(extracted_fields["fx_rate"]).combine_first(
         pd.to_numeric(_existing_column(parsed_df, "fx_rate"), errors="coerce")
     )
@@ -108,16 +118,24 @@ def parse_trade_descriptions(statement_df: pd.DataFrame) -> pd.DataFrame:
 
 def parse_div_description(statement_df: pd.DataFrame) -> pd.DataFrame:
     parsed_df = statement_df.copy()
-    extracted_fields = parsed_df["description"].where(
-        parsed_df["transaction"].eq("DIV")
-    ).str.extract(DIV_PATTERN)
-
-    parsed_df["ticker"] = extracted_fields["ticker"].combine_first(_existing_column(parsed_df, "ticker"))
-    parsed_df["company_name"] = extracted_fields["company_name"].combine_first(_existing_column(parsed_df, "company_name"))
-    parsed_df["type"] = extracted_fields["dividend_type"].combine_first(_existing_column(parsed_df, "type"))
-    parsed_df["execution_date"] = pd.to_datetime(extracted_fields["div_execution_date"]).combine_first(
-        _existing_column(parsed_df, "execution_date")
+    extracted_fields = (
+        parsed_df["description"]
+        .where(parsed_df["transaction"].eq("DIV"))
+        .str.extract(DIV_PATTERN)
     )
+
+    parsed_df["ticker"] = extracted_fields["ticker"].combine_first(
+        _existing_column(parsed_df, "ticker")
+    )
+    parsed_df["company_name"] = extracted_fields["company_name"].combine_first(
+        _existing_column(parsed_df, "company_name")
+    )
+    parsed_df["type"] = extracted_fields["dividend_type"].combine_first(
+        _existing_column(parsed_df, "type")
+    )
+    parsed_df["execution_date"] = pd.to_datetime(
+        extracted_fields["div_execution_date"]
+    ).combine_first(_existing_column(parsed_df, "execution_date"))
     parsed_df["fx_rate"] = pd.to_numeric(extracted_fields["fx_rate"]).combine_first(
         pd.to_numeric(_existing_column(parsed_df, "fx_rate"), errors="coerce")
     )
@@ -126,38 +144,52 @@ def parse_div_description(statement_df: pd.DataFrame) -> pd.DataFrame:
 
 def parse_nrt_description(statement_df: pd.DataFrame) -> pd.DataFrame:
     parsed_df = statement_df.copy()
-    extracted_fields = parsed_df["description"].where(
-        parsed_df["transaction"].eq("NRT")
-    ).str.extract(NRT_PATTERN)
-
-    parsed_df["type"] = extracted_fields["tax_type"].combine_first(_existing_column(parsed_df, "type"))
-    parsed_df["execution_date"] = pd.to_datetime(extracted_fields["nrt_execution_date"]).combine_first(
-        _existing_column(parsed_df, "execution_date")
+    extracted_fields = (
+        parsed_df["description"]
+        .where(parsed_df["transaction"].eq("NRT"))
+        .str.extract(NRT_PATTERN)
     )
+
+    parsed_df["type"] = extracted_fields["tax_type"].combine_first(
+        _existing_column(parsed_df, "type")
+    )
+    parsed_df["execution_date"] = pd.to_datetime(
+        extracted_fields["nrt_execution_date"]
+    ).combine_first(_existing_column(parsed_df, "execution_date"))
     return parsed_df
 
 
 def parse_cont_description(statement_df: pd.DataFrame) -> pd.DataFrame:
     parsed_df = statement_df.copy()
-    extracted_fields = parsed_df["description"].where(
-        parsed_df["transaction"].eq("CONT")
-    ).str.extract(CONT_PATTERN)
-
-    parsed_df["type"] = extracted_fields["contribution_type"].combine_first(_existing_column(parsed_df, "type"))
-    parsed_df["execution_date"] = pd.to_datetime(extracted_fields["cont_execution_date"]).combine_first(
-        _existing_column(parsed_df, "execution_date")
+    extracted_fields = (
+        parsed_df["description"]
+        .where(parsed_df["transaction"].eq("CONT"))
+        .str.extract(CONT_PATTERN)
     )
+
+    parsed_df["type"] = extracted_fields["contribution_type"].combine_first(
+        _existing_column(parsed_df, "type")
+    )
+    parsed_df["execution_date"] = pd.to_datetime(
+        extracted_fields["cont_execution_date"]
+    ).combine_first(_existing_column(parsed_df, "execution_date"))
     return parsed_df
 
 
 def parse_fplint_description(statement_df: pd.DataFrame) -> pd.DataFrame:
     parsed_df = statement_df.copy()
-    extracted_fields = parsed_df["description"].where(
-        parsed_df["transaction"].eq("FPLINT")
-    ).str.extract(FPLINT_PATTERN)
+    extracted_fields = (
+        parsed_df["description"]
+        .where(parsed_df["transaction"].eq("FPLINT"))
+        .str.extract(FPLINT_PATTERN)
+    )
 
-    parsed_df["type"] = extracted_fields["interest_type"].combine_first(_existing_column(parsed_df, "type"))
-    parsed_df["fx_rate"] = pd.to_numeric(extracted_fields["fplint_fx_rate"]).combine_first(
+    parsed_df["type"] = extracted_fields["interest_type"].combine_first(
+        _existing_column(parsed_df, "type")
+    )
+    parsed_df["fx_rate"] = pd.to_numeric(
+        extracted_fields["fplint_fx_rate"]
+    ).combine_first(
         pd.to_numeric(_existing_column(parsed_df, "fx_rate"), errors="coerce")
     )
     return parsed_df
@@ -165,51 +197,71 @@ def parse_fplint_description(statement_df: pd.DataFrame) -> pd.DataFrame:
 
 def parse_stkdis_description(statement_df: pd.DataFrame) -> pd.DataFrame:
     parsed_df = statement_df.copy()
-    extracted_fields = parsed_df["description"].where(
-        parsed_df["transaction"].eq("STKDIS")
-    ).str.extract(STKDIS_PATTERN)
+    extracted_fields = (
+        parsed_df["description"]
+        .where(parsed_df["transaction"].eq("STKDIS"))
+        .str.extract(STKDIS_PATTERN)
+    )
 
-    parsed_df["ticker"] = extracted_fields["ticker"].combine_first(_existing_column(parsed_df, "ticker"))
-    parsed_df["company_name"] = extracted_fields["company_name"].combine_first(_existing_column(parsed_df, "company_name"))
-    parsed_df["type"] = extracted_fields["distribution_type"].combine_first(_existing_column(parsed_df, "type"))
-    parsed_df["share_count"] = pd.to_numeric(extracted_fields["distribution_share_count"]).combine_first(
+    parsed_df["ticker"] = extracted_fields["ticker"].combine_first(
+        _existing_column(parsed_df, "ticker")
+    )
+    parsed_df["company_name"] = extracted_fields["company_name"].combine_first(
+        _existing_column(parsed_df, "company_name")
+    )
+    parsed_df["type"] = extracted_fields["distribution_type"].combine_first(
+        _existing_column(parsed_df, "type")
+    )
+    parsed_df["share_count"] = pd.to_numeric(
+        extracted_fields["distribution_share_count"]
+    ).combine_first(
         pd.to_numeric(_existing_column(parsed_df, "share_count"), errors="coerce")
     )
-    parsed_df["execution_date"] = pd.to_datetime(extracted_fields["stkdis_execution_date"]).combine_first(
-        _existing_column(parsed_df, "execution_date")
-    )
+    parsed_df["execution_date"] = pd.to_datetime(
+        extracted_fields["stkdis_execution_date"]
+    ).combine_first(_existing_column(parsed_df, "execution_date"))
     return parsed_df
 
 
 def parse_trfin_description(statement_df: pd.DataFrame) -> pd.DataFrame:
     parsed_df = statement_df.copy()
-    extracted_fields = parsed_df["description"].where(
-        parsed_df["transaction"].eq("TRFIN")
-    ).str.extract(TRFIN_PATTERN)
-
-    parsed_df["type"] = extracted_fields["transfer_type"].combine_first(_existing_column(parsed_df, "type"))
-    parsed_df["execution_date"] = pd.to_datetime(extracted_fields["trfin_execution_date"]).combine_first(
-        _existing_column(parsed_df, "execution_date")
+    extracted_fields = (
+        parsed_df["description"]
+        .where(parsed_df["transaction"].eq("TRFIN"))
+        .str.extract(TRFIN_PATTERN)
     )
+
+    parsed_df["type"] = extracted_fields["transfer_type"].combine_first(
+        _existing_column(parsed_df, "type")
+    )
+    parsed_df["execution_date"] = pd.to_datetime(
+        extracted_fields["trfin_execution_date"]
+    ).combine_first(_existing_column(parsed_df, "execution_date"))
     return parsed_df
 
 
 def parse_wd_description(statement_df: pd.DataFrame) -> pd.DataFrame:
     parsed_df = statement_df.copy()
-    extracted_fields = parsed_df["description"].where(
-        parsed_df["transaction"].eq("WD")
-    ).str.extract(WD_PATTERN)
-
-    parsed_df["type"] = extracted_fields["withdrawal_type"].combine_first(_existing_column(parsed_df, "type"))
-    parsed_df["execution_date"] = pd.to_datetime(extracted_fields["wd_execution_date"]).combine_first(
-        _existing_column(parsed_df, "execution_date")
+    extracted_fields = (
+        parsed_df["description"]
+        .where(parsed_df["transaction"].eq("WD"))
+        .str.extract(WD_PATTERN)
     )
+
+    parsed_df["type"] = extracted_fields["withdrawal_type"].combine_first(
+        _existing_column(parsed_df, "type")
+    )
+    parsed_df["execution_date"] = pd.to_datetime(
+        extracted_fields["wd_execution_date"]
+    ).combine_first(_existing_column(parsed_df, "execution_date"))
     return parsed_df
 
 
 def add_debit_credit_columns(statement_df: pd.DataFrame) -> pd.DataFrame:
     converted_df = statement_df.copy()
-    converted_df["debit"] = converted_df["amount"].where(converted_df["amount"] < 0).abs()
+    converted_df["debit"] = (
+        converted_df["amount"].where(converted_df["amount"] < 0).abs()
+    )
     converted_df["credit"] = converted_df["amount"].where(converted_df["amount"] > 0)
     return converted_df
 

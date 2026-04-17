@@ -56,5 +56,7 @@ def add_momentum_metrics(df_long: pd.DataFrame) -> pd.DataFrame:
         .groupby("Commodity")["Interest"]
         .transform(lambda s: s.rolling(window=7, min_periods=1).mean())
     )
-    out["Momentum"] = out.groupby("Commodity")["Smoothed Interest"].transform(lambda s: s.diff())
+    out["Momentum"] = out.groupby("Commodity")["Smoothed Interest"].transform(
+        lambda s: s.diff()
+    )
     return out

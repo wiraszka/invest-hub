@@ -13,7 +13,11 @@ MOCK_SUBMISSIONS = {
     "filings": {
         "recent": {
             "form": ["10-K", "10-Q", "8-K"],
-            "accessionNumber": ["0001234567-25-000001", "0001234567-25-000002", "0001234567-25-000003"],
+            "accessionNumber": [
+                "0001234567-25-000001",
+                "0001234567-25-000002",
+                "0001234567-25-000003",
+            ],
             "primaryDocument": ["form10k.htm", "form10q.htm", "form8k.htm"],
         }
     }
@@ -142,7 +146,10 @@ def test_get_xbrl_facts_returns_structured_data():
 def test_get_xbrl_facts_returns_none_for_missing_concepts():
     with patch("services.sec.requests.get") as mock_get:
         mock_get.return_value.raise_for_status = lambda: None
-        mock_get.return_value.json.side_effect = [MOCK_TICKER_JSON, {"facts": {"us-gaap": {}}}]
+        mock_get.return_value.json.side_effect = [
+            MOCK_TICKER_JSON,
+            {"facts": {"us-gaap": {}}},
+        ]
 
         result = get_xbrl_facts("NNE")
 

@@ -115,15 +115,23 @@ def render_interest_panel(latest: pd.DataFrame) -> None:
             delta_class = "neutral"
         else:
             delta_text = f"{momentum:+.1f}"
-            delta_class = "positive" if momentum > 0 else "negative" if momentum < 0 else "neutral"
+            delta_class = (
+                "positive"
+                if momentum > 0
+                else "negative"
+                if momentum < 0
+                else "neutral"
+            )
 
         divider_class = " with-divider" if idx < last_index else ""
         cards.append(
-            "<div class=\"interest-card" + divider_class + "\">"
-            + f"<div class=\"interest-name\">{html.escape(str(row.Commodity))}</div>"
-            + "<div class=\"interest-row\">"
-            + f"<span class=\"interest-value\">{int(row.Interest)}</span>"
-            + f"<span class=\"interest-delta {delta_class}\">{delta_text}</span>"
+            '<div class="interest-card'
+            + divider_class
+            + '">'
+            + f'<div class="interest-name">{html.escape(str(row.Commodity))}</div>'
+            + '<div class="interest-row">'
+            + f'<span class="interest-value">{int(row.Interest)}</span>'
+            + f'<span class="interest-delta {delta_class}">{delta_text}</span>'
             + "</div></div>"
         )
 
@@ -134,13 +142,17 @@ def render_interest_panel(latest: pd.DataFrame) -> None:
 def render_home_page() -> None:
     st.title("HOME")
     st.caption("Landing page for your market dashboard workspace.")
-    st.info("Home content placeholder. Add portfolio summary, market overview, or quick links here.")
+    st.info(
+        "Home content placeholder. Add portfolio summary, market overview, or quick links here."
+    )
 
 
 def render_investments_page() -> None:
     st.title("INVESTMENTS")
     st.caption("Portfolio and strategy views can live here.")
-    st.info("Investments page placeholder. Add positions, watchlists, allocations, or performance widgets here.")
+    st.info(
+        "Investments page placeholder. Add positions, watchlists, allocations, or performance widgets here."
+    )
 
 
 def render_commodities_sentiment_page() -> None:
@@ -157,19 +169,25 @@ def render_commodities_sentiment_page() -> None:
     if "ms_applied_geo" not in st.session_state:
         st.session_state.ms_applied_geo = st.session_state.ms_geo
     if "ms_applied_selected_commodities" not in st.session_state:
-        st.session_state.ms_applied_selected_commodities = st.session_state.ms_selected_commodities.copy()
+        st.session_state.ms_applied_selected_commodities = (
+            st.session_state.ms_selected_commodities.copy()
+        )
 
     def apply_commodity_filters() -> None:
         st.session_state.ms_applied_timeframe = st.session_state.ms_timeframe
         st.session_state.ms_applied_geo = st.session_state.ms_geo
-        st.session_state.ms_applied_selected_commodities = st.session_state.ms_selected_commodities.copy()
+        st.session_state.ms_applied_selected_commodities = (
+            st.session_state.ms_selected_commodities.copy()
+        )
 
     timeframe_label = st.session_state.ms_applied_timeframe
     geo = st.session_state.ms_applied_geo
     selected_commodities = st.session_state.ms_applied_selected_commodities
 
     if not selected_commodities:
-        st.warning("Select at least one commodity in the filters below, then refresh the chart.")
+        st.warning(
+            "Select at least one commodity in the filters below, then refresh the chart."
+        )
     else:
         keywords = [COMMODITIES[c] for c in selected_commodities]
 
@@ -187,7 +205,9 @@ def render_commodities_sentiment_page() -> None:
 
         if not raw_df.empty:
             inverse_map = {v: k for k, v in COMMODITIES.items()}
-            raw_df = raw_df.rename(columns={c: inverse_map.get(c, c.title()) for c in raw_df.columns})
+            raw_df = raw_df.rename(
+                columns={c: inverse_map.get(c, c.title()) for c in raw_df.columns}
+            )
 
             long_df = to_long(raw_df)
             enriched_df = add_momentum_metrics(long_df)
@@ -215,26 +235,36 @@ def render_commodities_sentiment_page() -> None:
         else:
             st.warning("No trend data returned for the selected settings.")
 
-    controls_col1, controls_col2, controls_col3, controls_col4 = st.columns([1.3, 1.0, 2.3, 0.9])
+    controls_col1, controls_col2, controls_col3, controls_col4 = st.columns(
+        [1.3, 1.0, 2.3, 0.9]
+    )
     with controls_col1:
         st.selectbox("Time range", list(TIMEFRAME_OPTIONS.keys()), key="ms_timeframe")
     with controls_col2:
         st.text_input("Geo (country code)", key="ms_geo", placeholder="e.g. US")
     with controls_col3:
-        st.multiselect("Commodities", list(COMMODITIES.keys()), key="ms_selected_commodities")
+        st.multiselect(
+            "Commodities", list(COMMODITIES.keys()), key="ms_selected_commodities"
+        )
     with controls_col4:
         st.write("")
         st.button("Refresh", on_click=apply_commodity_filters, use_container_width=True)
 
-    st.caption("Note: Google Trends values are normalized (0-100) relative to the selected timeframe and comparison set.")
+    st.caption(
+        "Note: Google Trends values are normalized (0-100) relative to the selected timeframe and comparison set."
+    )
 
 
 def main() -> None:
-    st.set_page_config(page_title="Commodities Retail Sentiment Dashboard", layout="wide")
+    st.set_page_config(
+        page_title="Commodities Retail Sentiment Dashboard", layout="wide"
+    )
     inject_sidebar_menu_styles()
 
     with st.sidebar:
-        st.markdown('<div class="sidebar-menu-title">MENU</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="sidebar-menu-title">MENU</div>', unsafe_allow_html=True
+        )
         current_page = st.radio(
             "Navigation",
             MENU_ITEMS,

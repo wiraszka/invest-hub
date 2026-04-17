@@ -103,13 +103,19 @@ def test_trigger_analysis_enriches_cash_burn_for_pre_revenue():
     pre_revenue_xbrl = {**MOCK_XBRL, "operating_cash_flow": -8_000_000}
     pre_revenue_extraction = {
         "company_type": "pre-revenue",
-        "charts": {"capital_structure": None, "revenue_by_segment": None, "cash_burn": None},
+        "charts": {
+            "capital_structure": None,
+            "revenue_by_segment": None,
+            "cash_burn": None,
+        },
     }
 
     with (
         patch("routers.analysis.get_filing_sections", return_value=MOCK_FILING),
         patch("routers.analysis.get_xbrl_facts", return_value=pre_revenue_xbrl),
-        patch("routers.analysis.classify_and_extract", return_value=pre_revenue_extraction),
+        patch(
+            "routers.analysis.classify_and_extract", return_value=pre_revenue_extraction
+        ),
         patch("routers.analysis.get_current_price", return_value=MOCK_PRICE),
         patch("routers.analysis.generate_snapshot", return_value=MOCK_SNAPSHOT),
         patch("routers.analysis.upsert_analysis") as mock_upsert,
@@ -122,7 +128,9 @@ def test_trigger_analysis_enriches_cash_burn_for_pre_revenue():
 
 def test_trigger_analysis_uppercases_ticker():
     with (
-        patch("routers.analysis.get_filing_sections", return_value=MOCK_FILING) as mock_sec,
+        patch(
+            "routers.analysis.get_filing_sections", return_value=MOCK_FILING
+        ) as mock_sec,
         patch("routers.analysis.get_xbrl_facts", return_value=MOCK_XBRL),
         patch("routers.analysis.classify_and_extract", return_value=MOCK_EXTRACTION),
         patch("routers.analysis.get_current_price", return_value=MOCK_PRICE),
@@ -135,14 +143,19 @@ def test_trigger_analysis_uppercases_ticker():
 
 
 def test_trigger_analysis_sec_not_found():
-    with patch("routers.analysis.get_filing_sections", side_effect=ValueError("No 10-K found")):
+    with patch(
+        "routers.analysis.get_filing_sections", side_effect=ValueError("No 10-K found")
+    ):
         response = client.post("/api/analysis/INVALID")
 
     assert response.status_code == 404
 
 
 def test_trigger_analysis_sec_error():
-    with patch("routers.analysis.get_filing_sections", side_effect=Exception("Connection error")):
+    with patch(
+        "routers.analysis.get_filing_sections",
+        side_effect=Exception("Connection error"),
+    ):
         response = client.post("/api/analysis/AAPL")
 
     assert response.status_code == 502
@@ -152,7 +165,9 @@ def test_trigger_analysis_llm_error():
     with (
         patch("routers.analysis.get_filing_sections", return_value=MOCK_FILING),
         patch("routers.analysis.get_xbrl_facts", return_value=MOCK_XBRL),
-        patch("routers.analysis.classify_and_extract", side_effect=Exception("API error")),
+        patch(
+            "routers.analysis.classify_and_extract", side_effect=Exception("API error")
+        ),
     ):
         response = client.post("/api/analysis/AAPL")
 

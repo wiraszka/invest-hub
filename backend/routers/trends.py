@@ -28,7 +28,9 @@ def trends(
     geo: str = Query(""),
 ) -> dict:
     if not commodities:
-        raise HTTPException(status_code=400, detail="At least one commodity is required")
+        raise HTTPException(
+            status_code=400, detail="At least one commodity is required"
+        )
 
     unknown = [c for c in commodities if c not in COMMODITIES]
     if unknown:

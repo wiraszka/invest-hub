@@ -33,16 +33,13 @@ FORM_LIMITS = {
     "10-K/A": 2,
     "10-Q": 6,
     "10-Q/A": 3,
-
     # Material event flow
     "8-K": 25,
     "8-K/A": 5,
-
     # Governance / compensation / proxy
     "DEF 14A": 5,
     "PRE 14A": 3,
     "DEFA14A": 3,
-
     # Capital markets / dilution / M&A
     "S-1": 3,
     "S-1/A": 5,
@@ -55,22 +52,18 @@ FORM_LIMITS = {
     "424B3": 3,
     "424B4": 3,
     "424B5": 5,
-
     # Insider ownership
     "3": 5,
     "4": 25,
     "5": 5,
-
     # Large shareholders
     "SC 13D": 10,
     "SC 13D/A": 15,
     "SC 13G": 10,
     "SC 13G/A": 15,
-
     # Institutional ownership
     "13F-HR": 8,
     "13F-HR/A": 5,
-
     # Foreign issuer equivalents
     "20-F": 3,
     "6-K": 20,
@@ -151,7 +144,9 @@ def submissions_to_dataframe(submissions: dict) -> pd.DataFrame:
     return df[existing].copy()
 
 
-def build_filing_urls(cik_10: str, accession: str, primary_document: str) -> tuple[str, str]:
+def build_filing_urls(
+    cik_10: str, accession: str, primary_document: str
+) -> tuple[str, str]:
     """
     Returns:
       filing_index_url
@@ -197,7 +192,9 @@ def select_filings(df: pd.DataFrame, form_limits: dict[str, int]) -> pd.DataFram
         return pd.DataFrame(columns=df.columns)
 
     selected = pd.concat(parts, ignore_index=True)
-    selected = selected.drop_duplicates(subset=["accessionNumber"]).reset_index(drop=True)
+    selected = selected.drop_duplicates(subset=["accessionNumber"]).reset_index(
+        drop=True
+    )
     return selected
 
 
@@ -250,13 +247,17 @@ def main():
             if not accession or not primary_document:
                 raise ValueError("Missing accession number or primary document")
 
-            index_url, primary_doc_url = build_filing_urls(cik_10, accession, primary_document)
+            index_url, primary_doc_url = build_filing_urls(
+                cik_10, accession, primary_document
+            )
 
             ext = Path(primary_document).suffix or ".html"
             form_dir = SAVE_DIR / safe_filename(filing_form)
             form_dir.mkdir(parents=True, exist_ok=True)
 
-            out_name = safe_filename(f"{record['filing_date']}_{filing_form}_{accession}{ext}")
+            out_name = safe_filename(
+                f"{record['filing_date']}_{filing_form}_{accession}{ext}"
+            )
             out_path = form_dir / out_name
 
             download_file(primary_doc_url, out_path)
@@ -278,8 +279,12 @@ def main():
 
     manifest = pd.DataFrame(rows)
     if not manifest.empty:
-        manifest["filing_date"] = pd.to_datetime(manifest["filing_date"], errors="coerce")
-        manifest = manifest.sort_values(["filing_date", "form"], ascending=[False, True]).reset_index(drop=True)
+        manifest["filing_date"] = pd.to_datetime(
+            manifest["filing_date"], errors="coerce"
+        )
+        manifest = manifest.sort_values(
+            ["filing_date", "form"], ascending=[False, True]
+        ).reset_index(drop=True)
 
     manifest.to_csv(MANIFEST_CSV, index=False)
     print(f"Saved manifest: {MANIFEST_CSV}")

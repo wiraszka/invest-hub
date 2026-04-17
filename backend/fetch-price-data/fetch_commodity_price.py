@@ -46,10 +46,14 @@ async def scrape_te_commodities_debug():
             page = await context.new_page()
 
             print("[3] Navigating to page...")
-            response = await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            response = await page.goto(
+                url, wait_until="domcontentloaded", timeout=60000
+            )
 
             print(f"    Final URL: {page.url}")
-            print(f"    Response status: {response.status if response else 'No response object'}")
+            print(
+                f"    Response status: {response.status if response else 'No response object'}"
+            )
 
             print("[4] Waiting a bit for JS-rendered content...")
             await page.wait_for_timeout(8000)

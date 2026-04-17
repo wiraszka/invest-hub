@@ -17,7 +17,9 @@ SNAPSHOT_MODEL = "claude-sonnet-4-6"
 COMPANY_TYPES = frozenset(
     {"pre-revenue", "revenue-generating", "mining-company", "oil-gas-stock"}
 )
-INDEPENDENCE_VALUES = frozenset({"independent", "possibly_acquired", "confirmed_inactive"})
+INDEPENDENCE_VALUES = frozenset(
+    {"independent", "possibly_acquired", "confirmed_inactive"}
+)
 
 _CLASSIFY_PROMPT = """You are a financial analyst. Given an annual filing excerpt (10-K or 20-F), return a JSON object with exactly this structure:
 

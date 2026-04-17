@@ -55,7 +55,9 @@ def fetch_trends_data(
     raw = raw.sort_index()
 
     # Long format for momentum calculation
-    long_df = raw.reset_index().rename(columns={"date": "Date", raw.index.name or "index": "Date"})
+    long_df = raw.reset_index().rename(
+        columns={"date": "Date", raw.index.name or "index": "Date"}
+    )
     if "Date" not in long_df.columns:
         long_df = long_df.rename(columns={long_df.columns[0]: "Date"})
     long_df = long_df.melt(id_vars="Date", var_name="Commodity", value_name="Interest")
@@ -64,7 +66,9 @@ def fetch_trends_data(
         .groupby("Commodity")["Interest"]
         .transform(lambda s: s.rolling(window=7, min_periods=1).mean())
     )
-    long_df["Momentum"] = long_df.groupby("Commodity")["Smoothed"].transform(lambda s: s.diff())
+    long_df["Momentum"] = long_df.groupby("Commodity")["Smoothed"].transform(
+        lambda s: s.diff()
+    )
 
     # Latest interest + momentum per commodity
     latest_df = (
@@ -77,7 +81,9 @@ def fetch_trends_data(
         {
             "commodity": row["Commodity"],
             "interest": int(row["Interest"]),
-            "momentum": None if pd.isna(row["Momentum"]) else round(float(row["Momentum"]), 1),
+            "momentum": None
+            if pd.isna(row["Momentum"])
+            else round(float(row["Momentum"]), 1),
         }
         for _, row in latest_df.iterrows()
     ]
