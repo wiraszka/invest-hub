@@ -130,6 +130,24 @@ def extract_10k_sections(text: str) -> str:
     return _extract_sections(text, _SECTION_PATTERNS)
 
 
+def get_filing_sections(ticker: str) -> str:
+    """Resolve ticker → fetch most recent 10-K → return extracted sections."""
+    cik_10 = resolve_cik(ticker)
+    submissions = get_submissions(cik_10)
+
+    recent = submissions.get("filings", {}).get("recent", {})
+    forms = recent.get("form", [])
+    accessions = recent.get("accessionNumber", [])
+    primary_docs = recent.get("primaryDocument", [])
+
+    for i, form in enumerate(forms):
+        if form in ("10-K", "10-K/A"):
+            text = fetch_filing_text(cik_10, accessions[i], primary_docs[i])
+            return extract_10k_sections(text)
+
+    raise ValueError("No 10-K found")
+
+
 def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
     """
     Return (facts_dict, reporting_currency) from the SEC XBRL API.
@@ -148,7 +166,7 @@ def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
     # Always accept both the exact form and its non-amended equivalent
     annual_forms = {"10-K", "20-F"} if is_20f else {"10-K", "10-K/A"}
 
-    result: dict[str, float | None] = {}
+    result: dict[str, float | None] = {key: None for key in _XBRL_FACTS}
     reporting_currency = "USD"
 
     # Try us-gaap first
