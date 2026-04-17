@@ -17,7 +17,7 @@ from services.sec import (
     resolve_cik,
 )
 from services.sec_20f import extract_20f_sections
-from services.sec_40f import extract_40f_sections
+from services.sec_40f import fetch_40f_sections
 
 SNAPSHOT_MODEL = "claude-sonnet-4-6"
 LLM_KNOWLEDGE_CUTOFF = "August 2025"
@@ -94,13 +94,15 @@ def trigger_analysis(ticker: str = Path(...)) -> dict:
     sections_extracted = False
     filing_text = ""
     try:
-        raw_text = fetch_filing_text(cik_10, accession, primary_doc)
-        if form_type in ("20-F", "20-F/A"):
-            filing_text = extract_20f_sections(raw_text)
-        elif form_type in ("40-F", "40-F/A"):
-            filing_text = extract_40f_sections(raw_text)
+        if form_type in ("40-F", "40-F/A"):
+            # Primary doc is a thin cover; actual content is in EX-99.1 (AIF)
+            filing_text = fetch_40f_sections(cik_10, accession)
         else:
-            filing_text = extract_10k_sections(raw_text)
+            raw_text = fetch_filing_text(cik_10, accession, primary_doc)
+            if form_type in ("20-F", "20-F/A"):
+                filing_text = extract_20f_sections(raw_text)
+            else:
+                filing_text = extract_10k_sections(raw_text)
         sections_extracted = bool(filing_text.strip())
     except Exception:
         # Proceed with empty text — LLM will do its best with no filing context
