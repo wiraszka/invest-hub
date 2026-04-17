@@ -2,7 +2,12 @@ from unittest.mock import patch
 
 import pytest
 
-from services.sec import get_filing_sections, get_xbrl_facts, resolve_cik
+from services.sec import (
+    ANNUAL_FORM_TYPES,
+    get_filing_sections,
+    get_xbrl_facts,
+    resolve_cik,
+)
 
 MOCK_TICKER_JSON = {
     "0": {"ticker": "NNE", "cik_str": 1898848, "title": "Nano Nuclear Energy Inc."},
@@ -128,6 +133,36 @@ def test_get_filing_sections_raises_when_no_10k():
 
         with pytest.raises(ValueError, match="No 10-K found"):
             get_filing_sections("NNE")
+
+
+def test_annual_form_types_includes_40f():
+    assert "40-F" in ANNUAL_FORM_TYPES
+    assert "40-F/A" in ANNUAL_FORM_TYPES
+
+
+def test_find_recent_annual_returns_40f():
+    submissions_40f = {
+        "filings": {
+            "recent": {
+                "form": ["40-F", "6-K", "6-K"],
+                "accessionNumber": [
+                    "0001234567-25-000001",
+                    "0001234567-25-000002",
+                    "0001234567-25-000003",
+                ],
+                "primaryDocument": ["form40f.htm", "form6k1.htm", "form6k2.htm"],
+                "filingDate": ["2025-03-01", "2024-12-01", "2024-09-01"],
+            }
+        }
+    }
+
+    from services.sec import find_recent_annual
+
+    accession, primary_doc, form_type, filing_date = find_recent_annual(submissions_40f)
+
+    assert form_type == "40-F"
+    assert primary_doc == "form40f.htm"
+    assert filing_date == "2025-03-01"
 
 
 def test_get_xbrl_facts_returns_structured_data():

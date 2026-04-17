@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.6.2] - 2026-04-17
+
+### Added
+
+- Support 40-F filings for Canadian MJDS filers (e.g. AEM, WPM) — detects as the most recent annual filing and extracts business, risk, and MD&A sections from the Canadian AIF structure
+- Apply IFRS XBRL fallback for 40-F filers in addition to 20-F filers
+
+## [v1.6.1] - 2026-04-17
+
+### Changed
+
+- Move LLM snapshot system prompt from MongoDB into code — removes the `prompts` collection dependency and ensures the correct generalized prompt is always used
+
 ## [v1.6.0] - 2026-04-16
 
 ### Added
@@ -100,6 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.6.2]: https://github.com/wiraszka/invest-hub/compare/v1.6.1...v1.6.2
+[v1.6.1]: https://github.com/wiraszka/invest-hub/compare/v1.6.0...v1.6.1
 [v1.6.0]: https://github.com/wiraszka/invest-hub/compare/v1.5.0...v1.6.0
 [v1.5.0]: https://github.com/wiraszka/invest-hub/compare/v1.4.1...v1.5.0
 [v1.4.1]: https://github.com/wiraszka/invest-hub/compare/v1.4.0...v1.4.1

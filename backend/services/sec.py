@@ -13,7 +13,7 @@ HEADERS = {
 TIMEOUT = 30
 TICKER_JSON_URL = "https://www.sec.gov/files/company_tickers.json"
 
-ANNUAL_FORM_TYPES = {"10-K", "10-K/A", "20-F", "20-F/A"}
+ANNUAL_FORM_TYPES = {"10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A"}
 _STALE_THRESHOLD_DAYS = 548  # ~18 months
 
 # Sections of the 10-K most useful for LLM analysis
@@ -159,12 +159,13 @@ def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
     resp.raise_for_status()
     raw = resp.json()
 
-    is_20f = form_type in ("20-F", "20-F/A")
-    annual_forms = (
-        {form_type, form_type.rstrip("/A")} if "/" in form_type else {form_type}
-    )
-    # Always accept both the exact form and its non-amended equivalent
-    annual_forms = {"10-K", "20-F"} if is_20f else {"10-K", "10-K/A"}
+    is_foreign_filer = form_type in ("20-F", "20-F/A", "40-F", "40-F/A")
+    if form_type in ("20-F", "20-F/A"):
+        annual_forms = {"20-F", "20-F/A"}
+    elif form_type in ("40-F", "40-F/A"):
+        annual_forms = {"40-F", "40-F/A"}
+    else:
+        annual_forms = {"10-K", "10-K/A"}
 
     result: dict[str, float | None] = {key: None for key in _XBRL_FACTS}
     reporting_currency = "USD"
@@ -176,8 +177,8 @@ def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
             result[key] = _latest_value(us_gaap, concepts, annual_forms)
         reporting_currency = _detect_currency(us_gaap, _XBRL_FACTS, annual_forms)
 
-    # For 20-F filers where us-gaap is empty or sparse, try ifrs-full
-    if is_20f and all(v is None for v in result.values()):
+    # For foreign filers (20-F, 40-F) where us-gaap is empty or sparse, try ifrs-full
+    if is_foreign_filer and all(v is None for v in result.values()):
         from services.sec_20f import get_ifrs_xbrl_facts
 
         ifrs_result, ifrs_currency = get_ifrs_xbrl_facts(raw, annual_forms)

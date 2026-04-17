@@ -17,6 +17,7 @@ from services.sec import (
     resolve_cik,
 )
 from services.sec_20f import extract_20f_sections
+from services.sec_40f import extract_40f_sections
 
 SNAPSHOT_MODEL = "claude-sonnet-4-6"
 LLM_KNOWLEDGE_CUTOFF = "August 2025"
@@ -96,6 +97,8 @@ def trigger_analysis(ticker: str = Path(...)) -> dict:
         raw_text = fetch_filing_text(cik_10, accession, primary_doc)
         if form_type in ("20-F", "20-F/A"):
             filing_text = extract_20f_sections(raw_text)
+        elif form_type in ("40-F", "40-F/A"):
+            filing_text = extract_40f_sections(raw_text)
         else:
             filing_text = extract_10k_sections(raw_text)
         sections_extracted = bool(filing_text.strip())
