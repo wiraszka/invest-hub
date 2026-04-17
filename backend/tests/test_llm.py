@@ -21,7 +21,9 @@ def test_classify_and_extract_returns_valid_structure():
     json_response = '{"company_type": "revenue-generating", "charts": {"capital_structure": {"market_cap_usd": 500000000, "net_debt_usd": 50000000}, "revenue_by_segment": null, "cash_burn": null}}'
 
     with patch("services.llm._client") as mock_client:
-        mock_client.return_value.messages.create.return_value = _mock_message(json_response)
+        mock_client.return_value.messages.create.return_value = _mock_message(
+            json_response
+        )
 
         result = classify_and_extract(MOCK_FILING)
 
@@ -34,7 +36,9 @@ def test_classify_and_extract_falls_back_on_unknown_type():
     json_response = '{"company_type": "something-unknown", "charts": {"capital_structure": null, "revenue_by_segment": null, "cash_burn": null}}'
 
     with patch("services.llm._client") as mock_client:
-        mock_client.return_value.messages.create.return_value = _mock_message(json_response)
+        mock_client.return_value.messages.create.return_value = _mock_message(
+            json_response
+        )
 
         result = classify_and_extract(MOCK_FILING)
 
@@ -46,7 +50,9 @@ def test_classify_and_extract_handles_json_in_prose():
     json_response = '```json\n{"company_type": "pre-revenue", "charts": {"capital_structure": null, "revenue_by_segment": null, "cash_burn": {"annual_burn_usd": 5000000}}}\n```'
 
     with patch("services.llm._client") as mock_client:
-        mock_client.return_value.messages.create.return_value = _mock_message(json_response)
+        mock_client.return_value.messages.create.return_value = _mock_message(
+            json_response
+        )
 
         result = classify_and_extract(MOCK_FILING)
 
@@ -59,7 +65,9 @@ def test_generate_snapshot_returns_prose():
         patch("services.llm.get_prompt", return_value=MOCK_PROMPT),
         patch("services.llm._client") as mock_client,
     ):
-        mock_client.return_value.messages.create.return_value = _mock_message(MOCK_SNAPSHOT)
+        mock_client.return_value.messages.create.return_value = _mock_message(
+            MOCK_SNAPSHOT
+        )
 
         result = generate_snapshot("AAPL", "revenue-generating", MOCK_FILING)
 

@@ -40,11 +40,46 @@ class StatementParserTests(unittest.TestCase):
     def test_remove_non_transactions_filters_only_target_rows(self) -> None:
         df = self.make_df(
             [
-                {"date": "2025-12-01", "transaction": "BUY", "description": "a", "amount": -10, "balance": 90, "currency": "CAD"},
-                {"date": "2025-12-01", "transaction": "LOAN", "description": "b", "amount": 0, "balance": 90, "currency": "CAD"},
-                {"date": "2025-12-01", "transaction": "RECALL", "description": "c", "amount": 0, "balance": 90, "currency": "CAD"},
-                {"date": "2025-12-01", "transaction": "STKREORG", "description": "d", "amount": 0, "balance": 90, "currency": "CAD"},
-                {"date": "2025-12-01", "transaction": "DIV", "description": "e", "amount": 1, "balance": 91, "currency": "CAD"},
+                {
+                    "date": "2025-12-01",
+                    "transaction": "BUY",
+                    "description": "a",
+                    "amount": -10,
+                    "balance": 90,
+                    "currency": "CAD",
+                },
+                {
+                    "date": "2025-12-01",
+                    "transaction": "LOAN",
+                    "description": "b",
+                    "amount": 0,
+                    "balance": 90,
+                    "currency": "CAD",
+                },
+                {
+                    "date": "2025-12-01",
+                    "transaction": "RECALL",
+                    "description": "c",
+                    "amount": 0,
+                    "balance": 90,
+                    "currency": "CAD",
+                },
+                {
+                    "date": "2025-12-01",
+                    "transaction": "STKREORG",
+                    "description": "d",
+                    "amount": 0,
+                    "balance": 90,
+                    "currency": "CAD",
+                },
+                {
+                    "date": "2025-12-01",
+                    "transaction": "DIV",
+                    "description": "e",
+                    "amount": 1,
+                    "balance": 91,
+                    "currency": "CAD",
+                },
             ]
         )
 
@@ -230,11 +265,15 @@ class StatementParserTests(unittest.TestCase):
 
         parsed_df = ws_statement_parser.parse_fplint_description(df)
 
-        self.assertEqual(parsed_df.loc[0, "type"], "Stock lending monthly interest payment")
+        self.assertEqual(
+            parsed_df.loc[0, "type"], "Stock lending monthly interest payment"
+        )
         self.assertAlmostEqual(parsed_df.loc[0, "fx_rate"], 1.3854)
         self.assertTrue(pd.isna(parsed_df.loc[1, "fx_rate"]))
 
-    def test_parse_stkdis_description_parses_distribution_into_share_count(self) -> None:
+    def test_parse_stkdis_description_parses_distribution_into_share_count(
+        self,
+    ) -> None:
         df = self.make_df(
             [
                 {
@@ -251,7 +290,9 @@ class StatementParserTests(unittest.TestCase):
         parsed_df = ws_statement_parser.parse_stkdis_description(df)
 
         self.assertEqual(parsed_df.loc[0, "ticker"], "ELE")
-        self.assertEqual(parsed_df.loc[0, "company_name"], "Elemental Altus Royalties Corp")
+        self.assertEqual(
+            parsed_df.loc[0, "company_name"], "Elemental Altus Royalties Corp"
+        )
         self.assertEqual(parsed_df.loc[0, "type"], "Distribution of")
         self.assertAlmostEqual(parsed_df.loc[0, "share_count"], -30.0)
         self.assertEqual(str(parsed_df.loc[0, "execution_date"].date()), "2025-11-14")
@@ -297,9 +338,30 @@ class StatementParserTests(unittest.TestCase):
     def test_add_debit_credit_columns_splits_signed_amounts(self) -> None:
         df = self.make_df(
             [
-                {"date": "2025-12-16", "transaction": "BUY", "description": "a", "amount": -103.53, "balance": 1000, "currency": "CAD"},
-                {"date": "2025-12-16", "transaction": "DIV", "description": "b", "amount": 24.54, "balance": 1024.54, "currency": "CAD"},
-                {"date": "2025-12-16", "transaction": "ZERO", "description": "c", "amount": 0.0, "balance": 1024.54, "currency": "CAD"},
+                {
+                    "date": "2025-12-16",
+                    "transaction": "BUY",
+                    "description": "a",
+                    "amount": -103.53,
+                    "balance": 1000,
+                    "currency": "CAD",
+                },
+                {
+                    "date": "2025-12-16",
+                    "transaction": "DIV",
+                    "description": "b",
+                    "amount": 24.54,
+                    "balance": 1024.54,
+                    "currency": "CAD",
+                },
+                {
+                    "date": "2025-12-16",
+                    "transaction": "ZERO",
+                    "description": "c",
+                    "amount": 0.0,
+                    "balance": 1024.54,
+                    "currency": "CAD",
+                },
             ]
         )
 
@@ -312,9 +374,14 @@ class StatementParserTests(unittest.TestCase):
         self.assertTrue(pd.isna(converted_df.loc[2, "debit"]))
         self.assertTrue(pd.isna(converted_df.loc[2, "credit"]))
 
-    def test_full_pipeline_over_all_14_statements_populates_expected_fields(self) -> None:
+    def test_full_pipeline_over_all_14_statements_populates_expected_fields(
+        self,
+    ) -> None:
         files = sorted(Path(__file__).with_name("ws-statements").glob("*.csv"))
-        raw_df = pd.concat([ws_statement_parser.load_statement(path) for path in files], ignore_index=True)
+        raw_df = pd.concat(
+            [ws_statement_parser.load_statement(path) for path in files],
+            ignore_index=True,
+        )
 
         filtered_df = ws_statement_parser.remove_non_transactions(raw_df)
         trade_df = ws_statement_parser.parse_trade_descriptions(filtered_df)
@@ -328,9 +395,10 @@ class StatementParserTests(unittest.TestCase):
         final_df = ws_statement_parser.add_debit_credit_columns(final_df)
 
         self.assertEqual(len(files), 14)
-        self.assertEqual(sorted(final_df["transaction"].unique().tolist()), [
-            "BUY", "CONT", "DIV", "FPLINT", "NRT", "SELL", "STKDIS", "TRFIN", "WD"
-        ])
+        self.assertEqual(
+            sorted(final_df["transaction"].unique().tolist()),
+            ["BUY", "CONT", "DIV", "FPLINT", "NRT", "SELL", "STKDIS", "TRFIN", "WD"],
+        )
 
         checks = [
             ("BUY", "ticker"),
@@ -348,7 +416,9 @@ class StatementParserTests(unittest.TestCase):
         for transaction, field in checks:
             subset = final_df[final_df["transaction"].eq(transaction)]
             self.assertFalse(subset.empty)
-            self.assertFalse(subset[field].isna().any(), msg=f"{transaction} missing {field}")
+            self.assertFalse(
+                subset[field].isna().any(), msg=f"{transaction} missing {field}"
+            )
 
 
 if __name__ == "__main__":

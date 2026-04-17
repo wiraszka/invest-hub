@@ -13,6 +13,22 @@ import {
   YAxis,
 } from "recharts";
 
+export interface DataIntegrity {
+  filing_type: string;
+  filing_date: string;
+  filing_recency: "fresh" | "stale";
+  reporting_currency: string;
+  xbrl_quality: "full" | "partial" | "none";
+  sections_extracted: boolean;
+  company_independence:
+    | "independent"
+    | "possibly_acquired"
+    | "confirmed_inactive";
+  llm_model: string;
+  llm_knowledge_cutoff: string;
+  analysis_timestamp: string;
+}
+
 export interface AnalysisData {
   ticker: string;
   company_type: string;
@@ -35,6 +51,7 @@ export interface AnalysisData {
     net_debt: number | null;
   };
   market_cap_usd: number | null;
+  data_integrity: DataIntegrity;
   updated_at: string;
 }
 
@@ -82,6 +99,136 @@ function MetricCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-md bg-neutral-800 px-4 py-3">
       <div className="text-xs text-neutral-500 mb-1">{label}</div>
       <div className="text-sm font-semibold text-neutral-100">{value}</div>
+    </div>
+  );
+}
+
+function IntegrityRow({
+  label,
+  value,
+  status,
+}: {
+  label: string;
+  value: string;
+  status: "green" | "yellow" | "red" | "neutral";
+}) {
+  const icon =
+    status === "green"
+      ? "✓"
+      : status === "yellow"
+        ? "⚠"
+        : status === "red"
+          ? "✗"
+          : "·";
+  const iconClass =
+    status === "green"
+      ? "text-green-500"
+      : status === "yellow"
+        ? "text-yellow-400"
+        : status === "red"
+          ? "text-red-500"
+          : "text-neutral-500";
+  return (
+    <tr className="border-t border-neutral-800">
+      <td className={`py-2 pr-4 text-xs font-mono w-4 ${iconClass}`}>{icon}</td>
+      <td className="py-2 pr-8 text-xs text-neutral-400">{label}</td>
+      <td className="py-2 text-xs text-neutral-300">{value}</td>
+    </tr>
+  );
+}
+
+function DataIntegrityTable({ di }: { di: DataIntegrity }) {
+  const independenceStatus =
+    di.company_independence === "independent"
+      ? "green"
+      : di.company_independence === "possibly_acquired"
+        ? "yellow"
+        : "red";
+
+  const independenceLabel =
+    di.company_independence === "independent"
+      ? "Independent"
+      : di.company_independence === "possibly_acquired"
+        ? "Possibly acquired"
+        : "Confirmed inactive";
+
+  return (
+    <div>
+      <SectionTitle>Data Integrity</SectionTitle>
+      <table className="w-full">
+        <tbody>
+          <IntegrityRow
+            label="Filing type"
+            value={di.filing_type || "None"}
+            status={di.filing_type ? "green" : "red"}
+          />
+          <IntegrityRow
+            label="Filing date"
+            value={di.filing_date || "Unknown"}
+            status={di.filing_date ? "neutral" : "red"}
+          />
+          <IntegrityRow
+            label="Filing recency"
+            value={
+              di.filing_recency === "fresh" ? "Fresh" : "Stale (>18 months)"
+            }
+            status={di.filing_recency === "fresh" ? "green" : "yellow"}
+          />
+          <IntegrityRow
+            label="Reporting currency"
+            value={di.reporting_currency || "Unknown"}
+            status={di.reporting_currency === "USD" ? "green" : "yellow"}
+          />
+          <IntegrityRow
+            label="XBRL data"
+            value={
+              di.xbrl_quality === "full"
+                ? "Full"
+                : di.xbrl_quality === "partial"
+                  ? "Partial"
+                  : "None"
+            }
+            status={
+              di.xbrl_quality === "full"
+                ? "green"
+                : di.xbrl_quality === "partial"
+                  ? "yellow"
+                  : "red"
+            }
+          />
+          <IntegrityRow
+            label="Filing text extracted"
+            value={
+              di.sections_extracted ? "Yes" : "No (LLM used own knowledge)"
+            }
+            status={di.sections_extracted ? "green" : "yellow"}
+          />
+          <IntegrityRow
+            label="Company status"
+            value={independenceLabel}
+            status={independenceStatus}
+          />
+          <IntegrityRow
+            label="LLM model"
+            value={di.llm_model || "Unknown"}
+            status="neutral"
+          />
+          <IntegrityRow
+            label="LLM knowledge cutoff"
+            value={di.llm_knowledge_cutoff || "Unknown"}
+            status="neutral"
+          />
+          <IntegrityRow
+            label="Analysis generated"
+            value={
+              di.analysis_timestamp
+                ? new Date(di.analysis_timestamp).toLocaleString()
+                : "Unknown"
+            }
+            status="neutral"
+          />
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -249,6 +396,9 @@ export default function ResearchPanel({ data }: Props) {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* Data Integrity */}
+      {data.data_integrity && <DataIntegrityTable di={data.data_integrity} />}
     </div>
   );
 }

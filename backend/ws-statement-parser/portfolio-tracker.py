@@ -55,7 +55,9 @@ def infer_asset_type(company_name: str | float | None) -> str | pd.NA:
 def prepare_transactions(statement_df: pd.DataFrame) -> pd.DataFrame:
     transactions_df = statement_df.copy()
     transactions_df["Account"] = transactions_df["source_file"].map(infer_account)
-    transactions_df["event_date"] = transactions_df["execution_date"].combine_first(transactions_df["date"])
+    transactions_df["event_date"] = transactions_df["execution_date"].combine_first(
+        transactions_df["date"]
+    )
     transactions_df = transactions_df.sort_values(
         ["event_date", "date", "source_file", "transaction", "description"],
         ascending=[True, True, True, True, True],
@@ -94,7 +96,11 @@ def apply_buy(position: dict, row: pd.Series) -> None:
 def apply_sell(position: dict, row: pd.Series) -> None:
     shares_sold = float(row["share_count"])
     current_shares = float(position["Shares Held"])
-    average_cost = 0.0 if current_shares == 0 else float(position["Cost Basis (CAD)"]) / current_shares
+    average_cost = (
+        0.0
+        if current_shares == 0
+        else float(position["Cost Basis (CAD)"]) / current_shares
+    )
     cost_removed = average_cost * shares_sold
     proceeds = float(row["amount"])
 
@@ -116,7 +122,11 @@ def apply_stock_distribution(position: dict, row: pd.Series) -> None:
         return
 
     shares_removed = abs(distributed_shares)
-    average_cost = 0.0 if current_shares == 0 else float(position["Cost Basis (CAD)"]) / current_shares
+    average_cost = (
+        0.0
+        if current_shares == 0
+        else float(position["Cost Basis (CAD)"]) / current_shares
+    )
     cost_removed = average_cost * shares_removed
 
     position["Shares Held"] -= shares_removed
@@ -141,7 +151,11 @@ def finalize_position(position: dict) -> dict:
         market_value = shares_held * float(current_price)
         unrealized_pl = market_value - cost_basis
         unrealized_pl_pct = pd.NA if cost_basis == 0 else unrealized_pl / cost_basis
-        total_net_pl = float(position["Realized P/L (CAD)"]) + unrealized_pl + float(position["Dividends/Distributions (CAD)"])
+        total_net_pl = (
+            float(position["Realized P/L (CAD)"])
+            + unrealized_pl
+            + float(position["Dividends/Distributions (CAD)"])
+        )
         position["Market Value (CAD)"] = market_value
         position["Unrealized P/L (CAD)"] = unrealized_pl
         position["Unrealized P/L (%)"] = unrealized_pl_pct
@@ -164,7 +178,9 @@ def build_portfolio_tracker(statement_df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         key = (row.Account, row.ticker, row.company_name)
-        position = positions.setdefault(key, initialize_position(pd.Series(row._asdict())))
+        position = positions.setdefault(
+            key, initialize_position(pd.Series(row._asdict()))
+        )
 
         if row.transaction == "BUY":
             apply_buy(position, pd.Series(row._asdict()))
@@ -177,7 +193,9 @@ def build_portfolio_tracker(statement_df: pd.DataFrame) -> pd.DataFrame:
 
     portfolio_rows = [finalize_position(position) for position in positions.values()]
     portfolio_df = pd.DataFrame(portfolio_rows)
-    portfolio_df = portfolio_df.sort_values(["Account", "Company/Fund Name"], kind="stable").reset_index(drop=True)
+    portfolio_df = portfolio_df.sort_values(
+        ["Account", "Company/Fund Name"], kind="stable"
+    ).reset_index(drop=True)
     return portfolio_df[OUTPUT_COLUMNS]
 
 

@@ -56,6 +56,7 @@ def upsert_analysis(
     chart_data: dict,
     xbrl_data: dict,
     market_cap_usd: float | None,
+    data_integrity: dict | None = None,
 ) -> None:
     _collection().update_one(
         {"ticker": ticker},
@@ -67,6 +68,7 @@ def upsert_analysis(
                 "snapshot": snapshot,
                 "chart_data": chart_data,
                 "xbrl_data": xbrl_data,
+                "data_integrity": data_integrity or {},
                 "updated_at": datetime.now(timezone.utc),
             }
         },

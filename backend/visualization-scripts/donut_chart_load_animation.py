@@ -101,11 +101,16 @@ ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
 cmd = [
     ffmpeg_exe,
     "-y",
-    "-framerate", str(FPS),
-    "-i", str(FRAME_DIR / "frame_%04d.png"),
-    "-c:v", "libvpx-vp9",
-    "-pix_fmt", "yuva420p",
-    "-auto-alt-ref", "0",
+    "-framerate",
+    str(FPS),
+    "-i",
+    str(FRAME_DIR / "frame_%04d.png"),
+    "-c:v",
+    "libvpx-vp9",
+    "-pix_fmt",
+    "yuva420p",
+    "-auto-alt-ref",
+    "0",
     OUT_WEBM,
 ]
 

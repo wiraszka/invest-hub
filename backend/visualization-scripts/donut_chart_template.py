@@ -50,17 +50,26 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
 DEFAULT_PALETTE = [
-    "#4e79a7", "#59a14f", "#f28e2b", "#e15759",
-    "#76b7b2", "#edc948", "#b07aa1", "#ff9da7",
+    "#4e79a7",
+    "#59a14f",
+    "#f28e2b",
+    "#e15759",
+    "#76b7b2",
+    "#edc948",
+    "#b07aa1",
+    "#ff9da7",
 ]
 
 
 # ── Shared helpers ─────────────────────────────────────────────────────────────
 
+
 def pct_only(threshold=5):
     """Return a pie-chart autopct formatter that suppresses labels below threshold."""
+
     def _fmt(pct):
         return f"{pct:.1f}%" if pct >= threshold else ""
+
     return _fmt
 
 
@@ -74,6 +83,7 @@ def _safe_show(values, chart_name):
 
 
 # ── Chart 1: Capital Structure ─────────────────────────────────────────────────
+
 
 def plot_capital_structure(
     company_name,
@@ -144,6 +154,7 @@ def plot_capital_structure(
 
 # ── Chart 2: NAV vs Enterprise Value ──────────────────────────────────────────
 
+
 def plot_nav_vs_ev(
     company_name,
     nav_or_npv,
@@ -198,6 +209,7 @@ def plot_nav_vs_ev(
 
 # ── Chart 3: Revenue by Segment / Geography / Asset ───────────────────────────
 
+
 def plot_revenue_by_segment(
     company_name,
     period_label,
@@ -224,7 +236,9 @@ def plot_revenue_by_segment(
     - Supply the latest reported period.
     """
     if not revenue_by_segment:
-        raise ValueError("Revenue by segment chart requires a non-empty revenue_by_segment dict.")
+        raise ValueError(
+            "Revenue by segment chart requires a non-empty revenue_by_segment dict."
+        )
 
     values = list(revenue_by_segment.values())
 
@@ -243,7 +257,9 @@ def plot_revenue_by_segment(
         wedgeprops=dict(width=0.72, edgecolor="white"),
         textprops={"fontsize": 11},
     )
-    ax.set_title(f"{company_name} - Revenue by {category_label} ({period_label})", fontsize=14)
+    ax.set_title(
+        f"{company_name} - Revenue by {category_label} ({period_label})", fontsize=14
+    )
     legend_labels = [
         f"{name}: {currency}{value:,.0f}M" for name, value in revenue_by_segment.items()
     ]
@@ -259,6 +275,7 @@ def plot_revenue_by_segment(
 
 
 # ── Chart 4: Reserves by Asset ─────────────────────────────────────────────────
+
 
 def plot_pp_reserves_by_asset(
     company_name,
@@ -357,7 +374,9 @@ def plot_metal_exposure(
     - Preserve commodity names exactly as used in the selected dataset.
     """
     if not metal_exposure:
-        raise ValueError("Metal exposure chart requires a non-empty metal_exposure dict.")
+        raise ValueError(
+            "Metal exposure chart requires a non-empty metal_exposure dict."
+        )
 
     labels = list(metal_exposure.keys())
     values = list(metal_exposure.values())
@@ -381,7 +400,9 @@ def plot_metal_exposure(
         f"{company_name} - Metal Exposure ({exposure_basis}, {period_label})",
         fontsize=14,
     )
-    legend_labels = [f"{metal}: {share:.0f}%" for metal, share in metal_exposure.items()]
+    legend_labels = [
+        f"{metal}: {share:.0f}%" for metal, share in metal_exposure.items()
+    ]
     ax.legend(
         _legend_handles(colors),
         legend_labels,
