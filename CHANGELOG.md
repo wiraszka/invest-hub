@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.6.6] - 2026-04-21
+
+### Fixed
+
+- Pin urllib3 to 1.26.x to fix `method_whitelist` incompatibility with pytrends 4.9.2
+
 ## [v1.6.5] - 2026-04-21
 
 ### Fixed
@@ -132,6 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.6.6]: https://github.com/wiraszka/invest-hub/compare/v1.6.5...v1.6.6
 [v1.6.5]: https://github.com/wiraszka/invest-hub/compare/v1.6.4...v1.6.5
 [v1.6.4]: https://github.com/wiraszka/invest-hub/compare/v1.6.3...v1.6.4
 [v1.6.3]: https://github.com/wiraszka/invest-hub/compare/v1.6.2...v1.6.3
