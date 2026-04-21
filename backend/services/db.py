@@ -90,6 +90,42 @@ def upsert_trends_cache(cache_key: str, data: dict) -> None:
     )
 
 
+def _transactions_collection() -> Collection:
+    return _db()["transactions"]
+
+
+# ---------------------------------------------------------------------------
+# Transactions
+# ---------------------------------------------------------------------------
+
+
+def replace_transactions(user_id: str, transactions: list[dict]) -> None:
+    col = _transactions_collection()
+    col.delete_many({"user_id": user_id})
+    if transactions:
+        col.insert_many([{"user_id": user_id, **t} for t in transactions])
+
+
+def get_transactions(user_id: str) -> list[dict]:
+    return list(
+        _transactions_collection().find(
+            {"user_id": user_id},
+            {"_id": 0, "user_id": 0},
+        ).sort("transaction_date", -1)
+    )
+
+
+def has_transactions(user_id: str) -> bool:
+    return (
+        _transactions_collection().count_documents({"user_id": user_id}, limit=1) > 0
+    )
+
+
+# ---------------------------------------------------------------------------
+# Analyses
+# ---------------------------------------------------------------------------
+
+
 def get_analysis(ticker: str) -> dict | None:
     doc = _collection().find_one({"ticker": ticker}, {"_id": 0})
     if doc and "updated_at" in doc:
