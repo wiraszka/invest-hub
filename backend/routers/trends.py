@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
+from services.db import get_trends_cache, upsert_trends_cache
 from services.trends import TIMEFRAME_OPTIONS, fetch_trends_data
 
 COMMODITIES: dict[str, str] = {
@@ -39,8 +40,13 @@ def trends(
     if timeframe not in TIMEFRAME_OPTIONS:
         raise HTTPException(status_code=400, detail=f"Unknown timeframe: {timeframe}")
 
+    cache_key = f"{','.join(sorted(commodities))}|{timeframe}|{geo.strip().upper()}"
+    cached = get_trends_cache(cache_key)
+    if cached is not None:
+        return cached
+
     try:
-        return fetch_trends_data(
+        result = fetch_trends_data(
             commodities=commodities,
             keyword_map=COMMODITIES,
             timeframe_label=timeframe,
@@ -48,3 +54,6 @@ def trends(
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    upsert_trends_cache(cache_key, result)
+    return result
