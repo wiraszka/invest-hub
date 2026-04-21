@@ -5,7 +5,12 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Path
 
 from services.db import get_analysis, upsert_analysis
-from services.llm import classify_and_extract, generate_snapshot
+from services.llm import (
+    LLM_KNOWLEDGE_CUTOFF,
+    SNAPSHOT_MODEL,
+    classify_and_extract,
+    generate_snapshot,
+)
 from services.price import get_current_price
 from services.sec import (
     extract_10k_sections,
@@ -18,9 +23,6 @@ from services.sec import (
 )
 from services.sec_20f import extract_20f_sections
 from services.sec_40f import fetch_40f_sections
-
-SNAPSHOT_MODEL = "claude-sonnet-4-6"
-LLM_KNOWLEDGE_CUTOFF = "August 2025"
 
 router = APIRouter()
 
@@ -162,6 +164,7 @@ def trigger_analysis(ticker: str = Path(...)) -> dict:
     # ------------------------------------------------------------------
     # Step 8 — Assemble data_integrity object
     # ------------------------------------------------------------------
+    analysis_timestamp = datetime.now(timezone.utc)
     data_integrity = {
         "filing_type": form_type,
         "filing_date": filing_date,
@@ -172,7 +175,7 @@ def trigger_analysis(ticker: str = Path(...)) -> dict:
         "company_independence": company_independence,
         "llm_model": SNAPSHOT_MODEL,
         "llm_knowledge_cutoff": LLM_KNOWLEDGE_CUTOFF,
-        "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
+        "analysis_timestamp": analysis_timestamp.isoformat(),
     }
 
     # ------------------------------------------------------------------
@@ -191,7 +194,16 @@ def trigger_analysis(ticker: str = Path(...)) -> dict:
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Failed to store analysis: {e}")
 
-    return {"ticker": ticker, "company_type": company_type, "status": "ok"}
+    return {
+        "ticker": ticker,
+        "company_type": company_type,
+        "snapshot": snapshot,
+        "chart_data": chart_data,
+        "xbrl_data": xbrl_data,
+        "market_cap_usd": market_cap_usd,
+        "data_integrity": data_integrity,
+        "updated_at": analysis_timestamp.isoformat(),
+    }
 
 
 @router.get("/api/analysis/{ticker}")

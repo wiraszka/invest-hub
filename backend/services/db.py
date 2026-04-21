@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from pymongo import MongoClient
@@ -68,8 +68,6 @@ def upsert_analysis(
 
 
 def get_trends_cache(cache_key: str) -> dict | None:
-    from datetime import timedelta
-
     cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
     doc = _trends_collection().find_one(
         {"cache_key": cache_key, "cached_at": {"$gte": cutoff}},

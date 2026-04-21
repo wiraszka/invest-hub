@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from services.sec import _extract_sections
+from services.sec import _detect_currency, _extract_sections, _latest_value
 
 _SECTION_PATTERNS_20F = [
     re.compile(r"item\s+4\.?\s+information\s+on\s+the\s+company", re.I),
@@ -62,60 +62,11 @@ def get_ifrs_xbrl_facts(raw_facts: dict, annual_forms: set[str]) -> tuple[dict, 
     """
     ifrs = raw_facts.get("facts", {}).get("ifrs-full", {})
     result: dict[str, float | None] = {}
-    reporting_currency = "USD"
 
     for key, concepts in IFRS_XBRL_FACTS.items():
-        result[key] = _ifrs_latest_value(ifrs, concepts, annual_forms)
+        result[key] = _latest_value(ifrs, concepts, annual_forms, any_currency=True)
 
-    reporting_currency = _ifrs_detect_currency(ifrs, IFRS_XBRL_FACTS, annual_forms)
-
-    result["net_debt"] = None  # derived by caller after net_debt calculation
+    reporting_currency = _detect_currency(ifrs, IFRS_XBRL_FACTS, annual_forms)
+    result["net_debt"] = None  # derived by caller
 
     return result, reporting_currency
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
-def _ifrs_latest_value(
-    namespace: dict, concept_names: list[str], annual_forms: set[str]
-) -> float | None:
-    for name in concept_names:
-        concept = namespace.get(name)
-        if not concept:
-            continue
-        units = concept.get("units", {})
-        # IFRS monetary values are keyed by currency code directly
-        for unit_key, entries in units.items():
-            if unit_key == "shares":
-                continue
-            annual = [
-                e for e in entries if e.get("form") in annual_forms and "end" in e
-            ]
-            if not annual:
-                continue
-            annual.sort(key=lambda e: e["end"], reverse=True)
-            return float(annual[0]["val"])
-    return None
-
-
-def _ifrs_detect_currency(
-    namespace: dict, facts_map: dict[str, list[str]], annual_forms: set[str]
-) -> str:
-    for concepts in facts_map.values():
-        for name in concepts:
-            concept = namespace.get(name)
-            if not concept:
-                continue
-            units = concept.get("units", {})
-            for unit_key, entries in units.items():
-                if unit_key == "shares":
-                    continue
-                annual = [
-                    e for e in entries if e.get("form") in annual_forms and "end" in e
-                ]
-                if annual:
-                    return unit_key
-    return "USD"

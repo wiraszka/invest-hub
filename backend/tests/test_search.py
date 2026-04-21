@@ -48,11 +48,11 @@ def test_search_by_name():
     assert "NNE" in tickers
 
 
-def test_search_returns_at_most_five_results():
+def test_search_returns_at_most_ten_results():
     response = client.get("/api/search?q=A")
 
     assert response.status_code == 200
-    assert len(response.json()) <= 5
+    assert len(response.json()) <= 10
 
 
 def test_search_result_shape():

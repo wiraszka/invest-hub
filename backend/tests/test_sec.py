@@ -4,7 +4,7 @@ import pytest
 
 from services.sec import (
     ANNUAL_FORM_TYPES,
-    get_filing_sections,
+    find_recent_annual,
     get_xbrl_facts,
     resolve_cik,
 )
@@ -13,34 +13,6 @@ MOCK_TICKER_JSON = {
     "0": {"ticker": "NNE", "cik_str": 1898848, "title": "Nano Nuclear Energy Inc."},
     "1": {"ticker": "AAPL", "cik_str": 320193, "title": "Apple Inc."},
 }
-
-MOCK_SUBMISSIONS = {
-    "filings": {
-        "recent": {
-            "form": ["10-K", "10-Q", "8-K"],
-            "accessionNumber": [
-                "0001234567-25-000001",
-                "0001234567-25-000002",
-                "0001234567-25-000003",
-            ],
-            "primaryDocument": ["form10k.htm", "form10q.htm", "form8k.htm"],
-        }
-    }
-}
-
-MOCK_10K_HTML = """
-<html><body>
-<p>Item 1. Business</p>
-<p>We develop microreactors for clean energy production.</p>
-<p>Item 1A. Risk Factors</p>
-<p>We face significant regulatory and funding risks.</p>
-<p>Item 2. Properties</p>
-<p>We lease office space in New York.</p>
-<p>Item 7. Management Discussion and Analysis</p>
-<p>We had no revenue in fiscal 2025. Cash burn was $5M.</p>
-<p>Item 8. Financial Statements</p>
-</body></html>
-"""
 
 MOCK_XBRL_FACTS = {
     "facts": {
@@ -67,6 +39,32 @@ MOCK_XBRL_FACTS = {
                     ]
                 }
             },
+        }
+    }
+}
+
+_SUBMISSIONS_40F = {
+    "filings": {
+        "recent": {
+            "form": ["40-F", "6-K", "6-K"],
+            "accessionNumber": [
+                "0001234567-25-000001",
+                "0001234567-25-000002",
+                "0001234567-25-000003",
+            ],
+            "primaryDocument": ["form40f.htm", "form6k1.htm", "form6k2.htm"],
+            "filingDate": ["2025-03-01", "2024-12-01", "2024-09-01"],
+        }
+    }
+}
+
+_SUBMISSIONS_NO_ANNUAL = {
+    "filings": {
+        "recent": {
+            "form": ["10-Q", "8-K"],
+            "accessionNumber": ["0001234567-25-000002", "0001234567-25-000003"],
+            "primaryDocument": ["form10q.htm", "form8k.htm"],
+            "filingDate": ["2025-02-01", "2025-01-01"],
         }
     }
 }
@@ -101,68 +99,22 @@ def test_resolve_cik_raises_on_unknown_ticker():
             resolve_cik("ZZZZ")
 
 
-def test_get_filing_sections_extracts_text():
-    with patch("services.sec.requests.get") as mock_get:
-        mock_get.return_value.raise_for_status = lambda: None
-        mock_get.return_value.json.side_effect = [MOCK_TICKER_JSON, MOCK_SUBMISSIONS]
-        mock_get.return_value.text = MOCK_10K_HTML
-
-        result = get_filing_sections("NNE")
-
-    assert "microreactors" in result
-    assert "regulatory" in result
-    assert "Cash burn" in result
-    # Item 2 (Properties) should not be included
-    assert "office space" not in result
-
-
-def test_get_filing_sections_raises_when_no_10k():
-    submissions_no_10k = {
-        "filings": {
-            "recent": {
-                "form": ["10-Q", "8-K"],
-                "accessionNumber": ["0001234567-25-000002", "0001234567-25-000003"],
-                "primaryDocument": ["form10q.htm", "form8k.htm"],
-            }
-        }
-    }
-
-    with patch("services.sec.requests.get") as mock_get:
-        mock_get.return_value.raise_for_status = lambda: None
-        mock_get.return_value.json.side_effect = [MOCK_TICKER_JSON, submissions_no_10k]
-
-        with pytest.raises(ValueError, match="No 10-K found"):
-            get_filing_sections("NNE")
-
-
 def test_annual_form_types_includes_40f():
     assert "40-F" in ANNUAL_FORM_TYPES
     assert "40-F/A" in ANNUAL_FORM_TYPES
 
 
 def test_find_recent_annual_returns_40f():
-    submissions_40f = {
-        "filings": {
-            "recent": {
-                "form": ["40-F", "6-K", "6-K"],
-                "accessionNumber": [
-                    "0001234567-25-000001",
-                    "0001234567-25-000002",
-                    "0001234567-25-000003",
-                ],
-                "primaryDocument": ["form40f.htm", "form6k1.htm", "form6k2.htm"],
-                "filingDate": ["2025-03-01", "2024-12-01", "2024-09-01"],
-            }
-        }
-    }
-
-    from services.sec import find_recent_annual
-
-    accession, primary_doc, form_type, filing_date = find_recent_annual(submissions_40f)
+    accession, primary_doc, form_type, filing_date = find_recent_annual(_SUBMISSIONS_40F)
 
     assert form_type == "40-F"
     assert primary_doc == "form40f.htm"
     assert filing_date == "2025-03-01"
+
+
+def test_find_recent_annual_raises_when_no_annual_filing():
+    with pytest.raises(ValueError, match="No recent annual filing"):
+        find_recent_annual(_SUBMISSIONS_NO_ANNUAL)
 
 
 def test_get_xbrl_facts_returns_structured_data():

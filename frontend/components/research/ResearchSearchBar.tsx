@@ -9,7 +9,7 @@ interface SearchResult {
 }
 
 interface Props {
-  onSelect: (ticker: string, name: string) => void;
+  onSelect: (ticker: string) => void;
 }
 
 export default function ResearchSearchBar({ onSelect }: Props) {
@@ -65,7 +65,7 @@ export default function ResearchSearchBar({ onSelect }: Props) {
     setQuery("");
     setResults([]);
     setOpen(false);
-    onSelect(result.ticker, result.name);
+    onSelect(result.ticker);
   }
 
   return (

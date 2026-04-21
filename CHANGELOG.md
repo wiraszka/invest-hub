@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.7.0] - 2026-04-21
+
+### Changed
+
+- Return full analysis document from `POST /api/analysis/{ticker}` — eliminates the redundant follow-up GET request from the frontend
+- Consolidate duplicate XBRL helpers: `_latest_value` and `_detect_currency` in `sec.py` now serve both GAAP and IFRS namespaces; removed identical copies from `sec_20f.py`
+- Move `SNAPSHOT_MODEL` and `LLM_KNOWLEDGE_CUTOFF` to `services/llm.py` as the single source of truth; `routers/analysis.py` now imports them
+
+### Fixed
+
+- Cache Anthropic client at module level to avoid creating a new connection pool on every LLM call
+- Move `timedelta` import to module level in `services/db.py`
+- Update SEC EDGAR User-Agent to use real contact email in both `services/sec.py` and `services/search.py`
+
+### Removed
+
+- Delete `backend/app.py`, `backend/trends.py`, and `backend/constants.py` — Streamlit-era files unused since the FastAPI rewrite
+- Delete `get_filing_sections` from `services/sec.py` — unused since v1.6.0
+
+### Tests
+
+- Fix `test_search_returns_at_most_five_results` — limit was raised to 10 in v1.4.0; test was asserting stale behaviour
+- Add `test_find_recent_annual_raises_when_no_annual_filing` to `test_sec.py`
+- Add merger notice and `company_independence` fallback coverage to `test_llm.py`
+- Add `test_trends.py` covering cache hit, cache miss, fetch error, and validation
+
 ## [v1.6.6] - 2026-04-21
 
 ### Fixed
@@ -138,6 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.7.0]: https://github.com/wiraszka/invest-hub/compare/v1.6.6...v1.7.0
 [v1.6.6]: https://github.com/wiraszka/invest-hub/compare/v1.6.5...v1.6.6
 [v1.6.5]: https://github.com/wiraszka/invest-hub/compare/v1.6.4...v1.6.5
 [v1.6.4]: https://github.com/wiraszka/invest-hub/compare/v1.6.3...v1.6.4
