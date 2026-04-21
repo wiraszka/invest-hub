@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.6.5] - 2026-04-21
+
+### Fixed
+
+- Add browser User-Agent header and retry logic to Google Trends requests to reduce cloud IP blocking
+- Cache trends results in MongoDB for 1 hour so repeated refreshes are served locally instead of hitting Google
+
 ## [v1.6.4] - 2026-04-20
 
 ### Fixed
@@ -125,6 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.6.5]: https://github.com/wiraszka/invest-hub/compare/v1.6.4...v1.6.5
 [v1.6.4]: https://github.com/wiraszka/invest-hub/compare/v1.6.3...v1.6.4
 [v1.6.3]: https://github.com/wiraszka/invest-hub/compare/v1.6.2...v1.6.3
 [v1.6.2]: https://github.com/wiraszka/invest-hub/compare/v1.6.1...v1.6.2

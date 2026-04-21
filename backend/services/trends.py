@@ -38,7 +38,21 @@ def fetch_trends_data(
     keywords = [keyword_map[c] for c in commodities]
     timeframe = _resolve_timeframe(timeframe_label)
 
-    pytrends = TrendReq(hl="en-US", tz=360)
+    pytrends = TrendReq(
+        hl="en-US",
+        tz=360,
+        retries=2,
+        backoff_factor=0.5,
+        requests_args={
+            "headers": {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            }
+        },
+    )
     pytrends.build_payload(keywords, timeframe=timeframe, geo=geo)
     raw = pytrends.interest_over_time()
 
