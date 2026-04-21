@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add browser User-Agent header and retry logic to Google Trends requests to reduce cloud IP blocking
 - Cache trends results in MongoDB for 1 hour so repeated refreshes are served locally instead of hitting Google
+- Pin urllib3 to 1.26.x to fix `method_whitelist` incompatibility with pytrends 4.9.2
 
 ## [v1.6.4] - 2026-04-20
 
