@@ -10,6 +10,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://invest-hub-frontend-six.vercel.app",
+        "https://investhub.tech",
+        "https://www.investhub.tech",
     ],
     allow_methods=["*"],
     allow_headers=["*"],
