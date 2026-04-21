@@ -44,7 +44,7 @@ describe("ResearchSearchBar", () => {
     });
   });
 
-  it("calls onSelect with ticker and name when a result is clicked", async () => {
+  it("calls onSelect with ticker when a result is clicked", async () => {
     render(<ResearchSearchBar onSelect={onSelect} />);
 
     await userEvent.type(
@@ -56,7 +56,7 @@ describe("ResearchSearchBar", () => {
 
     await userEvent.click(screen.getByText("AAPL").closest("button")!);
 
-    expect(onSelect).toHaveBeenCalledWith("AAPL", "Apple Inc.");
+    expect(onSelect).toHaveBeenCalledWith("AAPL");
   });
 
   it("clears the input after a result is selected", async () => {
