@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.6.4] - 2026-04-20
+
+### Fixed
+
+- Add `investhub.tech` and `www.investhub.tech` to CORS allowed origins so API requests from the new domain are not blocked
+
 ## [v1.6.3] - 2026-04-16
 
 ### Fixed
@@ -119,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.6.4]: https://github.com/wiraszka/invest-hub/compare/v1.6.3...v1.6.4
 [v1.6.3]: https://github.com/wiraszka/invest-hub/compare/v1.6.2...v1.6.3
 [v1.6.2]: https://github.com/wiraszka/invest-hub/compare/v1.6.1...v1.6.2
 [v1.6.1]: https://github.com/wiraszka/invest-hub/compare/v1.6.0...v1.6.1
