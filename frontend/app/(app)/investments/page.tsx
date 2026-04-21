@@ -58,9 +58,11 @@ export default function InvestmentsPage() {
     load();
   }, [load]);
 
-  function handleUpload() {
-    load();
-  }
+  const equityPositions =
+    positions?.filter((p) => p.account !== "Crypto") ?? [];
+  const cryptoPositions =
+    positions?.filter((p) => p.account === "Crypto") ?? [];
+  const hasCrypto = cryptoPositions.length > 0;
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl mx-auto">
@@ -73,9 +75,7 @@ export default function InvestmentsPage() {
             Upload your Wealthsimple activities export to track your portfolio
           </p>
         </div>
-        {hasData && userId && (
-          <CsvDropzone userId={userId} onUpload={handleUpload} />
-        )}
+        {hasData && userId && <CsvDropzone userId={userId} onUpload={load} />}
       </div>
 
       {loading && (
@@ -89,7 +89,7 @@ export default function InvestmentsPage() {
       )}
 
       {!loading && !hasData && userId && (
-        <CsvDropzone userId={userId} onUpload={handleUpload} />
+        <CsvDropzone userId={userId} onUpload={load} />
       )}
 
       {!loading && hasData && positions !== null && transactions !== null && (
@@ -117,7 +117,29 @@ export default function InvestmentsPage() {
             </button>
           </div>
 
-          {view === "positions" && <PositionsTable positions={positions} />}
+          {view === "positions" && (
+            <div className="flex flex-col gap-8">
+              {hasCrypto ? (
+                <>
+                  <section className="flex flex-col gap-4">
+                    <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
+                      Equities &amp; ETFs
+                    </h2>
+                    <PositionsTable positions={equityPositions} />
+                  </section>
+                  <section className="flex flex-col gap-4">
+                    <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
+                      Crypto
+                    </h2>
+                    <PositionsTable positions={cryptoPositions} />
+                  </section>
+                </>
+              ) : (
+                <PositionsTable positions={equityPositions} />
+              )}
+            </div>
+          )}
+
           {view === "transactions" && (
             <TransactionsTable transactions={transactions} />
           )}

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.9.0] - 2026-04-21
+
+### Added
+
+- Add sortable column headers to the Positions and Transactions tables — click once to sort, again to reverse, a third time to restore original order; numeric columns default to descending on first click
+- Split the Positions view into separate Equities & ETFs and Crypto tables when crypto holdings are detected
+
 ## [v1.8.0] - 2026-04-21
 
 ### Added
@@ -172,6 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.9.0]: https://github.com/wiraszka/invest-hub/compare/v1.8.0...v1.9.0
 [v1.8.0]: https://github.com/wiraszka/invest-hub/compare/v1.7.0...v1.8.0
 [v1.7.0]: https://github.com/wiraszka/invest-hub/compare/v1.6.6...v1.7.0
 [v1.6.6]: https://github.com/wiraszka/invest-hub/compare/v1.6.5...v1.6.6

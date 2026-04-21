@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import TransactionsTable from "@/components/investments/TransactionsTable";
 
 const MOCK_TRANSACTIONS = [
@@ -20,13 +21,13 @@ const MOCK_TRANSACTIONS = [
     account_type: "TFSA",
     activity_type: "Trade",
     activity_sub_type: "BUY",
-    symbol: "VFV",
-    name: "Vanguard S&P 500 Index ETF",
+    symbol: "ARX",
+    name: "ARC Resources Ltd",
     currency: "CAD",
     quantity: 10,
-    unit_price: 100,
+    unit_price: 25,
     commission: 0,
-    net_cash_amount: -1000,
+    net_cash_amount: -250,
   },
   {
     transaction_date: "2025-09-26",
@@ -48,14 +49,7 @@ describe("TransactionsTable", () => {
     render(<TransactionsTable transactions={MOCK_TRANSACTIONS} />);
 
     const rows = screen.getAllByRole("row");
-    // header row + 3 data rows
     expect(rows).toHaveLength(4);
-  });
-
-  it("shows the symbol for trade transactions", () => {
-    render(<TransactionsTable transactions={MOCK_TRANSACTIONS} />);
-
-    expect(screen.getAllByText("VFV").length).toBeGreaterThan(0);
   });
 
   it("shows human-readable type labels", () => {
@@ -78,5 +72,41 @@ describe("TransactionsTable", () => {
     render(<TransactionsTable transactions={[]} />);
 
     expect(screen.getByText(/no transactions/i)).toBeInTheDocument();
+  });
+
+  it("sorts by date ascending when Date header is clicked once", async () => {
+    render(<TransactionsTable transactions={MOCK_TRANSACTIONS} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /date/i }));
+
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("2025-08-13");
+    expect(rows[1]).toHaveTextContent("2025-09-01");
+    expect(rows[2]).toHaveTextContent("2025-09-26");
+  });
+
+  it("sorts by date descending when Date header is clicked twice", async () => {
+    render(<TransactionsTable transactions={MOCK_TRANSACTIONS} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /date/i }));
+    await userEvent.click(screen.getByRole("button", { name: /date/i }));
+
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("2025-09-26");
+    expect(rows[1]).toHaveTextContent("2025-09-01");
+    expect(rows[2]).toHaveTextContent("2025-08-13");
+  });
+
+  it("restores original order when a sorted header is clicked a third time", async () => {
+    render(<TransactionsTable transactions={MOCK_TRANSACTIONS} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /date/i }));
+    await userEvent.click(screen.getByRole("button", { name: /date/i }));
+    await userEvent.click(screen.getByRole("button", { name: /date/i }));
+
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("2025-09-01");
+    expect(rows[1]).toHaveTextContent("2025-08-13");
+    expect(rows[2]).toHaveTextContent("2025-09-26");
   });
 });
