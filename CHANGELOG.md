@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.8.0] - 2026-04-21
+
+### Added
+
+- Build out Investments page with drag-and-drop CSV upload, positions table (account, symbol, shares, avg cost, cost basis, realized P/L), and all-transactions view (latest first) sourced from Wealthsimple activities exports
+- Parse and persist Wealthsimple activities CSV to MongoDB per user, scoped by Clerk user ID; account IDs are stripped before storage
+- Add `POST /api/investments/upload`, `GET /api/investments/positions`, `GET /api/investments/transactions` endpoints
+
 ## [v1.7.0] - 2026-04-21
 
 ### Changed
@@ -164,6 +172,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.8.0]: https://github.com/wiraszka/invest-hub/compare/v1.7.0...v1.8.0
 [v1.7.0]: https://github.com/wiraszka/invest-hub/compare/v1.6.6...v1.7.0
 [v1.6.6]: https://github.com/wiraszka/invest-hub/compare/v1.6.5...v1.6.6
 [v1.6.5]: https://github.com/wiraszka/invest-hub/compare/v1.6.4...v1.6.5
