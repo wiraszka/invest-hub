@@ -7,7 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 
 HEADERS = {
-    "User-Agent": "invest-hub invest-hub-api@example.com",
+    "User-Agent": "invest-hub adam.wirasz@gmail.com",
     "Accept-Encoding": "gzip, deflate",
 }
 TIMEOUT = 30
@@ -130,23 +130,6 @@ def extract_10k_sections(text: str) -> str:
     return _extract_sections(text, _SECTION_PATTERNS)
 
 
-def get_filing_sections(ticker: str) -> str:
-    """Resolve ticker → fetch most recent 10-K → return extracted sections."""
-    cik_10 = resolve_cik(ticker)
-    submissions = get_submissions(cik_10)
-
-    recent = submissions.get("filings", {}).get("recent", {})
-    forms = recent.get("form", [])
-    accessions = recent.get("accessionNumber", [])
-    primary_docs = recent.get("primaryDocument", [])
-
-    for i, form in enumerate(forms):
-        if form in ("10-K", "10-K/A"):
-            text = fetch_filing_text(cik_10, accessions[i], primary_docs[i])
-            return extract_10k_sections(text)
-
-    raise ValueError("No 10-K found")
-
 
 def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
     """
@@ -247,20 +230,40 @@ def _extract_sections(text: str, section_patterns: list[re.Pattern]) -> str:
 
 
 def _latest_value(
-    namespace: dict, concept_names: list[str], annual_forms: set[str]
+    namespace: dict,
+    concept_names: list[str],
+    annual_forms: set[str],
+    *,
+    any_currency: bool = False,
 ) -> float | None:
-    """Return the most recent annual value for a list of concept names."""
+    """Return the most recent annual value for a list of concept names.
+
+    any_currency=False (default): GAAP mode — looks up USD then shares units.
+    any_currency=True: IFRS mode — iterates all non-shares unit keys.
+    """
     for name in concept_names:
         concept = namespace.get(name)
         if not concept:
             continue
         units = concept.get("units", {})
-        entries = units.get("USD") or units.get("shares") or []
-        annual = [e for e in entries if e.get("form") in annual_forms and "end" in e]
-        if not annual:
+        if any_currency:
+            entries: list = []
+            for unit_key, unit_entries in units.items():
+                if unit_key == "shares":
+                    continue
+                filtered = [
+                    e for e in unit_entries if e.get("form") in annual_forms and "end" in e
+                ]
+                if filtered:
+                    entries = filtered
+                    break
+        else:
+            entries = units.get("USD") or units.get("shares") or []
+            entries = [e for e in entries if e.get("form") in annual_forms and "end" in e]
+        if not entries:
             continue
-        annual.sort(key=lambda e: e["end"], reverse=True)
-        return float(annual[0]["val"])
+        entries.sort(key=lambda e: e["end"], reverse=True)
+        return float(entries[0]["val"])
     return None
 
 

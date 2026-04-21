@@ -88,7 +88,9 @@ def test_trigger_analysis_success():
     data = response.json()
     assert data["ticker"] == "AAPL"
     assert data["company_type"] == "revenue-generating"
-    assert data["status"] == "ok"
+    assert data["snapshot"] == MOCK_SNAPSHOT
+    assert "data_integrity" in data
+    assert "updated_at" in data
 
 
 def test_trigger_analysis_enriches_market_cap():

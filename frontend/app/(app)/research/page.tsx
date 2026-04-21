@@ -64,25 +64,17 @@ export default function ResearchPage() {
     setPanelData(null);
 
     try {
-      const postRes = await fetch(
+      const res = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/analysis/${ticker}`,
         { method: "POST" },
       );
 
-      if (!postRes.ok) {
-        const body = await postRes.json().catch(() => ({}));
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
         throw new Error(body.detail ?? "Analysis failed — please try again");
       }
 
-      const getRes = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/analysis/${ticker}`,
-      );
-
-      if (!getRes.ok) {
-        throw new Error("Failed to load results — please try again");
-      }
-
-      const data: AnalysisData = await getRes.json();
+      const data: AnalysisData = await res.json();
 
       const cache = readCache();
       cache[ticker] = data;
@@ -97,10 +89,6 @@ export default function ResearchPage() {
     }
   }, []);
 
-  function handleSelect(ticker: string) {
-    runAnalysis(ticker);
-  }
-
   return (
     <div className="flex flex-col gap-8 max-w-4xl mx-auto">
       <div>
@@ -110,10 +98,10 @@ export default function ResearchPage() {
         </p>
       </div>
 
-      <ResearchSearchBar onSelect={(ticker) => runAnalysis(ticker)} />
+      <ResearchSearchBar onSelect={runAnalysis} />
 
       {recentTickers.length > 0 && (
-        <RecentChips tickers={recentTickers} onSelect={handleSelect} />
+        <RecentChips tickers={recentTickers} onSelect={runAnalysis} />
       )}
 
       {loading && (

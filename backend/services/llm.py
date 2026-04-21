@@ -11,6 +11,7 @@ load_dotenv()
 
 CLASSIFY_MODEL = "claude-haiku-4-5-20251001"
 SNAPSHOT_MODEL = "claude-sonnet-4-6"
+LLM_KNOWLEDGE_CUTOFF = "August 2025"
 
 COMPANY_TYPES = frozenset(
     {"pre-revenue", "revenue-generating", "mining-company", "oil-gas-stock"}
@@ -64,11 +65,17 @@ _MERGER_NOTICE = (
 )
 
 
+_anthropic_client: anthropic.Anthropic | None = None
+
+
 def _client() -> anthropic.Anthropic:
-    key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set")
-    return anthropic.Anthropic(api_key=key, timeout=300.0)
+    global _anthropic_client
+    if _anthropic_client is None:
+        key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not key:
+            raise RuntimeError("ANTHROPIC_API_KEY is not set")
+        _anthropic_client = anthropic.Anthropic(api_key=key, timeout=300.0)
+    return _anthropic_client
 
 
 def _extract_json(text: str) -> dict:

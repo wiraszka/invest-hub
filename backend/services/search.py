@@ -3,7 +3,7 @@ from __future__ import annotations
 import requests
 
 SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
-SEC_HEADERS = {"User-Agent": "invest-hub contact@example.com"}
+SEC_HEADERS = {"User-Agent": "invest-hub adam.wirasz@gmail.com"}
 
 _cache: dict | None = None
 
