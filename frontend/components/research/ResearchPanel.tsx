@@ -16,17 +16,41 @@ import {
 export interface DataIntegrity {
   filing_type: string;
   filing_date: string;
-  filing_recency: "fresh" | "stale";
+  filing_recency: "fresh" | "stale" | "none";
   reporting_currency: string;
-  xbrl_quality: "full" | "partial" | "none";
   sections_extracted: boolean;
+  data_source: string;
+  fmp_financials: "full" | "partial" | "none";
   company_independence:
     | "independent"
     | "possibly_acquired"
     | "confirmed_inactive";
   llm_model: string;
-  llm_knowledge_cutoff: string;
   analysis_timestamp: string;
+}
+
+export interface FmpData {
+  currency: string;
+  income: {
+    year: number | null;
+    revenue: number | null;
+    gross_profit: number | null;
+    net_income: number | null;
+    ebitda: number | null;
+  }[];
+  balance_sheet: {
+    cash: number | null;
+    total_debt: number | null;
+    net_debt: number | null;
+    total_equity: number | null;
+    total_assets: number | null;
+  };
+  metrics: {
+    market_cap: number | null;
+    enterprise_value: number | null;
+    pe_ratio: number | null;
+    ev_ebitda: number | null;
+  };
 }
 
 export interface AnalysisData {
@@ -41,15 +65,7 @@ export interface AnalysisData {
     revenue_by_segment: Record<string, number> | null;
     cash_burn: { annual_burn_usd: number } | null;
   };
-  xbrl_data: {
-    cash: number | null;
-    total_debt: number | null;
-    revenue: number | null;
-    net_income: number | null;
-    operating_cash_flow: number | null;
-    shares_outstanding: number | null;
-    net_debt: number | null;
-  };
+  fmp_data: FmpData | null;
   market_cap_usd: number | null;
   data_integrity: DataIntegrity;
   updated_at: string;
@@ -180,18 +196,23 @@ function DataIntegrityTable({ di }: { di: DataIntegrity }) {
             status={di.reporting_currency === "USD" ? "green" : "yellow"}
           />
           <IntegrityRow
-            label="XBRL data"
+            label="Data source"
+            value={di.data_source || "Unknown"}
+            status={di.data_source === "SEC + FMP" ? "green" : "yellow"}
+          />
+          <IntegrityRow
+            label="FMP financials"
             value={
-              di.xbrl_quality === "full"
+              di.fmp_financials === "full"
                 ? "Full"
-                : di.xbrl_quality === "partial"
+                : di.fmp_financials === "partial"
                   ? "Partial"
                   : "None"
             }
             status={
-              di.xbrl_quality === "full"
+              di.fmp_financials === "full"
                 ? "green"
-                : di.xbrl_quality === "partial"
+                : di.fmp_financials === "partial"
                   ? "yellow"
                   : "red"
             }
@@ -214,11 +235,6 @@ function DataIntegrityTable({ di }: { di: DataIntegrity }) {
             status="neutral"
           />
           <IntegrityRow
-            label="LLM knowledge cutoff"
-            value={di.llm_knowledge_cutoff || "Unknown"}
-            status="neutral"
-          />
-          <IntegrityRow
             label="Analysis generated"
             value={
               di.analysis_timestamp
@@ -234,7 +250,9 @@ function DataIntegrityTable({ di }: { di: DataIntegrity }) {
 }
 
 export default function ResearchPanel({ data }: Props) {
-  const { ticker, company_type, snapshot, chart_data, xbrl_data } = data;
+  const { ticker, company_type, snapshot, chart_data, fmp_data } = data;
+  const latestIncome = fmp_data?.income?.[0] ?? null;
+  const balanceSheet = fmp_data?.balance_sheet ?? null;
 
   const snapshotLines = snapshot
     .split("\n")
@@ -286,9 +304,15 @@ export default function ResearchPanel({ data }: Props) {
         <SectionTitle>Key Metrics</SectionTitle>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <MetricCard label="Market Cap" value={fmt(data.market_cap_usd)} />
-          <MetricCard label="Revenue" value={fmt(xbrl_data.revenue)} />
-          <MetricCard label="Net Income" value={fmt(xbrl_data.net_income)} />
-          <MetricCard label="Cash" value={fmt(xbrl_data.cash)} />
+          <MetricCard
+            label="Revenue"
+            value={fmt(latestIncome?.revenue ?? null)}
+          />
+          <MetricCard
+            label="Net Income"
+            value={fmt(latestIncome?.net_income ?? null)}
+          />
+          <MetricCard label="Cash" value={fmt(balanceSheet?.cash ?? null)} />
         </div>
       </div>
 
@@ -342,11 +366,11 @@ export default function ResearchPanel({ data }: Props) {
               label="Annual Burn"
               value={fmt(chart_data.cash_burn.annual_burn_usd)}
             />
-            {xbrl_data.cash !== null &&
+            {balanceSheet?.cash != null &&
               chart_data.cash_burn.annual_burn_usd > 0 && (
                 <MetricCard
                   label="Runway"
-                  value={`${(xbrl_data.cash / chart_data.cash_burn.annual_burn_usd).toFixed(1)} yrs`}
+                  value={`${(balanceSheet.cash / chart_data.cash_burn.annual_burn_usd).toFixed(1)} yrs`}
                 />
               )}
           </div>

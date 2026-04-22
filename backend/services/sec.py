@@ -131,6 +131,44 @@ def extract_10k_sections(text: str) -> str:
 
 
 
+def get_sic_metadata(ticker: str) -> dict | None:
+    """
+    Return minimal metadata for a ticker using SEC submissions data.
+    Falls back to this when FMP doesn't cover the symbol.
+    Returns None if the ticker is not found in SEC's company list.
+    """
+    try:
+        cik = resolve_cik(ticker)
+    except ValueError:
+        return None
+
+    try:
+        submissions = get_submissions(cik)
+    except Exception:
+        return None
+
+    sector: str | None = submissions.get("sicDescription") or None
+
+    recent = submissions.get("filings", {}).get("recent", {})
+    forms = recent.get("form", [])
+    country = "United States"
+    for form in forms:
+        if form in ANNUAL_FORM_TYPES:
+            if form in ("40-F", "40-F/A"):
+                country = "Canada"
+            elif form in ("20-F", "20-F/A"):
+                country = "International"
+            break
+
+    return {
+        "asset_type": "Equity",
+        "sector": sector,
+        "country": country,
+        "sector_weights": None,
+        "country_weights": None,
+    }
+
+
 def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
     """
     Return (facts_dict, reporting_currency) from the SEC XBRL API.

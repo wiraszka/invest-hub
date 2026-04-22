@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Analyze button now only triggers FMP metadata lookup per ticker — the full LLM research pipeline is decoupled and will be triggered separately from the company page
 - `data_integrity` schema updated: remove `xbrl_quality`, add `data_source` ("SEC + FMP" / "FMP only") and `fmp_financials` ("full" / "partial" / "none") fields
+- Move Sector column in the Positions table to directly after Type
+
+### Fixed
+
+- Fall back to SEC EDGAR SIC data for symbol metadata when FMP does not cover a ticker — provides sector (from `sicDescription`) and country (inferred from annual filing type: 40-F → Canada, 20-F → International, 10-K → United States)
+- Ensure company names become clickable links after Analyze even when FMP returns no metadata for a ticker (e.g. small TSX listings)
+- Resolve Research Panel crash caused by accessing removed `xbrl_data` field after the pipeline was restructured to use FMP data
 
 ## [v1.9.0] - 2026-04-21
 

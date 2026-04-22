@@ -10,6 +10,7 @@ from services.db import (
 )
 from services.fmp import get_symbol_metadata as fetch_from_fmp
 from services.investments import build_positions, parse_csv
+from services.sec import get_sic_metadata as fetch_from_sec
 
 router = APIRouter()
 
@@ -63,11 +64,18 @@ def analyze_ticker_metadata(
         return cached
 
     fmp_data = fetch_from_fmp(ticker)
-    if not fmp_data:
+    if fmp_data:
+        upsert_symbol_metadata(ticker, fmp_data)
+        result = get_symbol_metadata(ticker) or {**fmp_data, "ticker": ticker}
+        result["has_analysis"] = get_analysis(ticker) is not None
+        return result
+
+    sec_data = fetch_from_sec(ticker)
+    if not sec_data:
         raise HTTPException(status_code=404, detail=f"No metadata found for {ticker}")
 
-    upsert_symbol_metadata(ticker, fmp_data)
-    result = get_symbol_metadata(ticker) or {**fmp_data, "ticker": ticker}
+    upsert_symbol_metadata(ticker, sec_data)
+    result = get_symbol_metadata(ticker) or {**sec_data, "ticker": ticker}
     result["has_analysis"] = get_analysis(ticker) is not None
     return result
 

@@ -39,11 +39,14 @@ interface ColDef {
   className?: string;
 }
 
-const COLUMNS: ColDef[] = [
+const COLS_LEFT: ColDef[] = [
   { key: "account", label: "Account", numeric: false, className: "w-24" },
   { key: "name", label: "Name", numeric: false, className: "w-48" },
   { key: "symbol", label: "Symbol", numeric: false, className: "w-20" },
   { key: "asset_type", label: "Type", numeric: false, className: "w-24" },
+];
+
+const COLS_RIGHT: ColDef[] = [
   { key: "shares_held", label: "Shares", numeric: true },
   { key: "avg_cost_per_share", label: "Avg Cost", numeric: true },
   { key: "cost_basis", label: "Cost Basis", numeric: true },
@@ -143,7 +146,7 @@ export default function PositionsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-neutral-800 text-left text-xs text-neutral-500">
-            {COLUMNS.map(({ key, label, numeric, className }) => (
+            {COLS_LEFT.map(({ key, label, numeric, className }) => (
               <th
                 key={key}
                 className={`px-4 py-3 ${numeric ? "text-right" : ""} ${className ?? ""}`}
@@ -160,6 +163,22 @@ export default function PositionsTable({
               </th>
             ))}
             <th className="w-28 px-4 py-3 text-neutral-500">Sector</th>
+            {COLS_RIGHT.map(({ key, label, numeric, className }) => (
+              <th
+                key={key}
+                className={`px-4 py-3 ${numeric ? "text-right" : ""} ${className ?? ""}`}
+              >
+                <button
+                  onClick={() => handleSort(key, numeric)}
+                  className={`inline-flex items-center gap-0.5 hover:text-neutral-300 ${
+                    sortKey === key ? "text-neutral-300" : ""
+                  } ${numeric ? "ml-auto" : ""}`}
+                >
+                  {label}
+                  {indicator(key)}
+                </button>
+              </th>
+            ))}
             {showStatusColumn && <th className="w-8 px-4 py-3" />}
           </tr>
         </thead>
@@ -192,6 +211,9 @@ export default function PositionsTable({
                 <td className="w-24 px-4 py-3 text-neutral-500">
                   {p.asset_type}
                 </td>
+                <td className="w-28 px-4 py-3 text-neutral-500">
+                  {sectorLabel(symbolMetadata[p.symbol])}
+                </td>
                 <td className="px-4 py-3 text-right text-neutral-200">
                   {fmt(p.shares_held, p.shares_held % 1 === 0 ? 0 : 4)}
                 </td>
@@ -211,9 +233,6 @@ export default function PositionsTable({
                   }`}
                 >
                   {p.realized_pl >= 0 ? "+" : ""}${fmt(p.realized_pl)}
-                </td>
-                <td className="w-28 px-4 py-3 text-neutral-500">
-                  {sectorLabel(symbolMetadata[p.symbol])}
                 </td>
                 {showStatusColumn && (
                   <td className="w-8 px-4 py-3 text-center">

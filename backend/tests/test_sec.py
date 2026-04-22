@@ -5,6 +5,7 @@ import pytest
 from services.sec import (
     ANNUAL_FORM_TYPES,
     find_recent_annual,
+    get_sic_metadata,
     get_xbrl_facts,
     resolve_cik,
 )
@@ -128,6 +129,98 @@ def test_get_xbrl_facts_returns_structured_data():
     assert result["total_debt"] == 2_000_000
     assert result["net_debt"] == -8_000_000
     assert result["revenue"] == 0
+
+
+_SUBMISSIONS_10K = {
+    "sicDescription": "Gold and Silver Ores Mining",
+    "filings": {
+        "recent": {
+            "form": ["10-K", "10-Q", "8-K"],
+            "accessionNumber": [
+                "0001234567-25-000001",
+                "0001234567-25-000002",
+                "0001234567-25-000003",
+            ],
+            "primaryDocument": ["form10k.htm", "form10q.htm", "form8k.htm"],
+            "filingDate": ["2025-03-01", "2024-12-01", "2024-09-01"],
+        }
+    },
+}
+
+_SUBMISSIONS_40F_SIC = {
+    "sicDescription": "Crude Petroleum and Natural Gas",
+    "filings": {
+        "recent": {
+            "form": ["40-F", "6-K"],
+            "accessionNumber": [
+                "0001234567-25-000001",
+                "0001234567-25-000002",
+            ],
+            "primaryDocument": ["form40f.htm", "form6k.htm"],
+            "filingDate": ["2025-03-01", "2024-12-01"],
+        }
+    },
+}
+
+_SUBMISSIONS_20F_SIC = {
+    "sicDescription": "Services-Computer Programming",
+    "filings": {
+        "recent": {
+            "form": ["20-F", "6-K"],
+            "accessionNumber": [
+                "0001234567-25-000001",
+                "0001234567-25-000002",
+            ],
+            "primaryDocument": ["form20f.htm", "form6k.htm"],
+            "filingDate": ["2025-03-01", "2024-12-01"],
+        }
+    },
+}
+
+
+def test_get_sic_metadata_returns_sector_and_country_for_10k():
+    with patch("services.sec.requests.get") as mock_get:
+        mock_get.return_value.raise_for_status = lambda: None
+        mock_get.return_value.json.side_effect = [MOCK_TICKER_JSON, _SUBMISSIONS_10K]
+
+        result = get_sic_metadata("NNE")
+
+    assert result is not None
+    assert result["sector"] == "Gold and Silver Ores Mining"
+    assert result["country"] == "United States"
+    assert result["asset_type"] == "Equity"
+
+
+def test_get_sic_metadata_returns_none_when_ticker_not_found():
+    with patch("services.sec.requests.get") as mock_get:
+        mock_get.return_value.raise_for_status = lambda: None
+        mock_get.return_value.json.return_value = MOCK_TICKER_JSON
+
+        result = get_sic_metadata("ZZZZ")
+
+    assert result is None
+
+
+def test_get_sic_metadata_infers_canada_from_40f():
+    with patch("services.sec.requests.get") as mock_get:
+        mock_get.return_value.raise_for_status = lambda: None
+        mock_get.return_value.json.side_effect = [MOCK_TICKER_JSON, _SUBMISSIONS_40F_SIC]
+
+        result = get_sic_metadata("NNE")
+
+    assert result is not None
+    assert result["country"] == "Canada"
+
+
+def test_get_sic_metadata_infers_international_from_20f():
+    with patch("services.sec.requests.get") as mock_get:
+        mock_get.return_value.raise_for_status = lambda: None
+        mock_get.return_value.json.side_effect = [MOCK_TICKER_JSON, _SUBMISSIONS_20F_SIC]
+
+        result = get_sic_metadata("NNE")
+
+    assert result is not None
+    assert result["country"] == "International"
 
 
 def test_get_xbrl_facts_returns_none_for_missing_concepts():
