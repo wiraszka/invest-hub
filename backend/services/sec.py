@@ -135,10 +135,17 @@ def get_sic_metadata(ticker: str) -> dict | None:
     """
     Return minimal metadata for a ticker using SEC submissions data.
     Falls back to this when FMP doesn't cover the symbol.
-    Returns None if the ticker is not found in SEC's company list.
+
+    For .TO tickers (Canadian listings), the bare ticker is looked up in SEC but
+    the result is only trusted if the company files a 40-F — confirming it is
+    actually a Canadian company and not a US company that happens to share the
+    same bare ticker symbol.
     """
+    base_ticker = ticker.removesuffix(".TO")
+    is_canadian = base_ticker != ticker
+
     try:
-        cik = resolve_cik(ticker)
+        cik = resolve_cik(base_ticker)
     except ValueError:
         return None
 
@@ -147,18 +154,23 @@ def get_sic_metadata(ticker: str) -> dict | None:
     except Exception:
         return None
 
-    sector: str | None = submissions.get("sicDescription") or None
-
     recent = submissions.get("filings", {}).get("recent", {})
     forms = recent.get("form", [])
-    country = "United States"
-    for form in forms:
-        if form in ANNUAL_FORM_TYPES:
-            if form in ("40-F", "40-F/A"):
-                country = "Canada"
-            elif form in ("20-F", "20-F/A"):
-                country = "International"
-            break
+    annual_form = next((f for f in forms if f in ANNUAL_FORM_TYPES), None)
+
+    if is_canadian:
+        if annual_form not in ("40-F", "40-F/A"):
+            return None
+        country = "Canada"
+    else:
+        if annual_form in ("40-F", "40-F/A"):
+            country = "Canada"
+        elif annual_form in ("20-F", "20-F/A"):
+            country = "International"
+        else:
+            country = "United States"
+
+    sector: str | None = submissions.get("sicDescription") or None
 
     return {
         "asset_type": "Equity",

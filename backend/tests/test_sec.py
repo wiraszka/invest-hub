@@ -212,6 +212,28 @@ def test_get_sic_metadata_infers_canada_from_40f():
     assert result["country"] == "Canada"
 
 
+def test_get_sic_metadata_rejects_to_ticker_when_sec_match_is_10k():
+    with patch("services.sec.requests.get") as mock_get:
+        mock_get.return_value.raise_for_status = lambda: None
+        mock_get.return_value.json.side_effect = [MOCK_TICKER_JSON, _SUBMISSIONS_10K]
+
+        result = get_sic_metadata("NNE.TO")
+
+    assert result is None
+
+
+def test_get_sic_metadata_accepts_to_ticker_when_sec_match_is_40f():
+    with patch("services.sec.requests.get") as mock_get:
+        mock_get.return_value.raise_for_status = lambda: None
+        mock_get.return_value.json.side_effect = [MOCK_TICKER_JSON, _SUBMISSIONS_40F_SIC]
+
+        result = get_sic_metadata("NNE.TO")
+
+    assert result is not None
+    assert result["country"] == "Canada"
+    assert result["sector"] == "Crude Petroleum and Natural Gas"
+
+
 def test_get_sic_metadata_infers_international_from_20f():
     with patch("services.sec.requests.get") as mock_get:
         mock_get.return_value.raise_for_status = lambda: None
