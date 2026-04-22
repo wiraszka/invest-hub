@@ -23,19 +23,6 @@ type SortKey =
   | "net_cash_amount";
 type SortDir = "asc" | "desc";
 
-interface ColDef {
-  key: SortKey;
-  label: string;
-  numeric: boolean;
-}
-
-const COLUMNS: ColDef[] = [
-  { key: "transaction_date", label: "Date", numeric: false },
-  { key: "account_type", label: "Account", numeric: false },
-  { key: "symbol", label: "Symbol", numeric: false },
-  { key: "net_cash_amount", label: "Amount", numeric: true },
-];
-
 interface Props {
   transactions: Transaction[];
 }
@@ -112,6 +99,20 @@ export default function TransactionsTable({ transactions }: Props) {
     );
   }
 
+  function sortButton(key: SortKey, label: string, numeric: boolean) {
+    return (
+      <button
+        onClick={() => handleSort(key, numeric)}
+        className={`inline-flex items-center gap-0.5 hover:text-neutral-300 ${
+          sortKey === key ? "text-neutral-300" : ""
+        } ${numeric ? "ml-auto" : ""}`}
+      >
+        {label}
+        {indicator(key)}
+      </button>
+    );
+  }
+
   if (transactions.length === 0) {
     return (
       <p className="text-center text-sm text-neutral-500">
@@ -125,24 +126,20 @@ export default function TransactionsTable({ transactions }: Props) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-neutral-800 text-left text-xs text-neutral-500">
-            {COLUMNS.map(({ key, label, numeric }) => (
-              <th
-                key={key}
-                className={`px-4 py-3 ${numeric ? "text-right" : ""}`}
-              >
-                <button
-                  onClick={() => handleSort(key, numeric)}
-                  className={`inline-flex items-center gap-0.5 hover:text-neutral-300 ${
-                    sortKey === key ? "text-neutral-300" : ""
-                  } ${numeric ? "ml-auto" : ""}`}
-                >
-                  {label}
-                  {indicator(key)}
-                </button>
-              </th>
-            ))}
-            <th className="px-4 py-3">Type</th>
-            <th className="px-4 py-3">Name</th>
+            <th className="w-24 px-4 py-3">
+              {sortButton("account_type", "Account", false)}
+            </th>
+            <th className="w-48 px-4 py-3">Name</th>
+            <th className="w-20 px-4 py-3">
+              {sortButton("symbol", "Symbol", false)}
+            </th>
+            <th className="w-24 px-4 py-3">Type</th>
+            <th className="px-4 py-3">
+              {sortButton("transaction_date", "Date", false)}
+            </th>
+            <th className="px-4 py-3 text-right">
+              {sortButton("net_cash_amount", "Amount", true)}
+            </th>
             <th className="px-4 py-3 text-right">Qty</th>
             <th className="px-4 py-3 text-right">Price</th>
           </tr>
@@ -153,12 +150,20 @@ export default function TransactionsTable({ transactions }: Props) {
               key={i}
               className="border-b border-neutral-800/50 last:border-0 hover:bg-neutral-800/30"
             >
+              <td className="w-24 px-4 py-3 text-neutral-400">
+                {t.account_type}
+              </td>
+              <td className="w-48 max-w-48 truncate px-4 py-3 text-neutral-400">
+                {t.name ?? "—"}
+              </td>
+              <td className="w-20 px-4 py-3 font-semibold text-neutral-100">
+                {t.symbol ?? "—"}
+              </td>
+              <td className={`w-24 px-4 py-3 ${typeBadgeClass(t)}`}>
+                {typeLabel(t)}
+              </td>
               <td className="px-4 py-3 tabular-nums text-neutral-400">
                 {t.transaction_date}
-              </td>
-              <td className="px-4 py-3 text-neutral-400">{t.account_type}</td>
-              <td className="px-4 py-3 font-semibold text-neutral-100">
-                {t.symbol ?? "—"}
               </td>
               <td
                 className={`px-4 py-3 text-right tabular-nums ${
@@ -170,12 +175,6 @@ export default function TransactionsTable({ transactions }: Props) {
                 {t.net_cash_amount != null
                   ? `${t.net_cash_amount >= 0 ? "+" : ""}$${fmt(t.net_cash_amount)}`
                   : "—"}
-              </td>
-              <td className={`px-4 py-3 ${typeBadgeClass(t)}`}>
-                {typeLabel(t)}
-              </td>
-              <td className="max-w-40 truncate px-4 py-3 text-neutral-400">
-                {t.name ?? "—"}
               </td>
               <td className="px-4 py-3 text-right tabular-nums text-neutral-300">
                 {t.quantity != null ? t.quantity : "—"}

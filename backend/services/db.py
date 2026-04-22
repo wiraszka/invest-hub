@@ -94,6 +94,10 @@ def _transactions_collection() -> Collection:
     return _db()["transactions"]
 
 
+def _symbol_metadata_collection() -> Collection:
+    return _db()["symbol_metadata"]
+
+
 # ---------------------------------------------------------------------------
 # Transactions
 # ---------------------------------------------------------------------------
@@ -124,6 +128,47 @@ def has_transactions(user_id: str) -> bool:
 # ---------------------------------------------------------------------------
 # Analyses
 # ---------------------------------------------------------------------------
+
+
+_METADATA_TTL_DAYS = 30
+
+
+# ---------------------------------------------------------------------------
+# Symbol metadata
+# ---------------------------------------------------------------------------
+
+
+def get_symbol_metadata(ticker: str) -> dict | None:
+    cutoff = datetime.now(timezone.utc) - timedelta(days=_METADATA_TTL_DAYS)
+    doc = _symbol_metadata_collection().find_one(
+        {"ticker": ticker, "fetched_at": {"$gte": cutoff}},
+        {"_id": 0},
+    )
+    if doc and "fetched_at" in doc:
+        doc["fetched_at"] = doc["fetched_at"].isoformat()
+    return doc
+
+
+def upsert_symbol_metadata(ticker: str, data: dict) -> None:
+    _symbol_metadata_collection().update_one(
+        {"ticker": ticker},
+        {"$set": {"ticker": ticker, **data, "fetched_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+
+def get_symbol_metadata_batch(tickers: list[str]) -> dict[str, dict]:
+    cutoff = datetime.now(timezone.utc) - timedelta(days=_METADATA_TTL_DAYS)
+    docs = _symbol_metadata_collection().find(
+        {"ticker": {"$in": tickers}, "fetched_at": {"$gte": cutoff}},
+        {"_id": 0},
+    )
+    result: dict[str, dict] = {}
+    for doc in docs:
+        if "fetched_at" in doc:
+            doc["fetched_at"] = doc["fetched_at"].isoformat()
+        result[doc["ticker"]] = doc
+    return result
 
 
 def get_analysis(ticker: str) -> dict | None:

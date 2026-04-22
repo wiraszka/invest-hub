@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 export interface Position {
@@ -15,10 +16,14 @@ export interface Position {
   dividends: number;
 }
 
+export type AnalysisStatus = "idle" | "loading" | "done" | "error";
+
 type SortKey = keyof Pick<
   Position,
-  | "symbol"
   | "account"
+  | "name"
+  | "symbol"
+  | "asset_type"
   | "shares_held"
   | "avg_cost_per_share"
   | "cost_basis"
@@ -30,11 +35,14 @@ interface ColDef {
   key: SortKey;
   label: string;
   numeric: boolean;
+  className?: string;
 }
 
 const COLUMNS: ColDef[] = [
-  { key: "account", label: "Account", numeric: false },
-  { key: "symbol", label: "Symbol", numeric: false },
+  { key: "account", label: "Account", numeric: false, className: "w-24" },
+  { key: "name", label: "Name", numeric: false, className: "w-48" },
+  { key: "symbol", label: "Symbol", numeric: false, className: "w-20" },
+  { key: "asset_type", label: "Type", numeric: false, className: "w-24" },
   { key: "shares_held", label: "Shares", numeric: true },
   { key: "avg_cost_per_share", label: "Avg Cost", numeric: true },
   { key: "cost_basis", label: "Cost Basis", numeric: true },
@@ -43,6 +51,8 @@ const COLUMNS: ColDef[] = [
 
 interface Props {
   positions: Position[];
+  analysisStatus?: Record<string, AnalysisStatus>;
+  analyzedTickers?: Set<string>;
 }
 
 function fmt(n: number, decimals = 2): string {
@@ -52,7 +62,26 @@ function fmt(n: number, decimals = 2): string {
   });
 }
 
-export default function PositionsTable({ positions }: Props) {
+function StatusCell({ status }: { status: AnalysisStatus }) {
+  if (status === "loading") {
+    return (
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-700 border-t-blue-400" />
+    );
+  }
+  if (status === "done") {
+    return <span className="text-sm text-emerald-400">✓</span>;
+  }
+  if (status === "error") {
+    return <span className="text-sm text-neutral-600">✗</span>;
+  }
+  return null;
+}
+
+export default function PositionsTable({
+  positions,
+  analysisStatus = {},
+  analyzedTickers = new Set(),
+}: Props) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [sortClicks, setSortClicks] = useState(0);
@@ -91,6 +120,8 @@ export default function PositionsTable({ positions }: Props) {
     );
   }
 
+  const showStatusColumn = Object.keys(analysisStatus).length > 0;
+
   if (positions.length === 0) {
     return (
       <p className="text-center text-sm text-neutral-500">No positions found</p>
@@ -102,10 +133,10 @@ export default function PositionsTable({ positions }: Props) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-neutral-800 text-left text-xs text-neutral-500">
-            {COLUMNS.map(({ key, label, numeric }) => (
+            {COLUMNS.map(({ key, label, numeric, className }) => (
               <th
                 key={key}
-                className={`px-4 py-3 ${numeric ? "text-right" : ""}`}
+                className={`px-4 py-3 ${numeric ? "text-right" : ""} ${className ?? ""}`}
               >
                 <button
                   onClick={() => handleSort(key, numeric)}
@@ -118,46 +149,66 @@ export default function PositionsTable({ positions }: Props) {
                 </button>
               </th>
             ))}
-            <th className="px-4 py-3">Name</th>
-            <th className="px-4 py-3">Type</th>
+            {showStatusColumn && <th className="w-8 px-4 py-3" />}
           </tr>
         </thead>
         <tbody>
-          {sorted.map((p, i) => (
-            <tr
-              key={`${p.account}-${p.symbol}-${i}`}
-              className="border-b border-neutral-800/50 last:border-0 hover:bg-neutral-800/30"
-            >
-              <td className="px-4 py-3 text-neutral-400">{p.account}</td>
-              <td className="px-4 py-3 font-semibold text-neutral-100">
-                {p.symbol}
-              </td>
-              <td className="px-4 py-3 text-right text-neutral-200">
-                {fmt(p.shares_held, p.shares_held % 1 === 0 ? 0 : 4)}
-              </td>
-              <td className="px-4 py-3 text-right text-neutral-200">
-                ${fmt(p.avg_cost_per_share, 4)}
-              </td>
-              <td className="px-4 py-3 text-right text-neutral-200">
-                ${fmt(p.cost_basis)}
-              </td>
-              <td
-                className={`px-4 py-3 text-right ${
-                  p.realized_pl > 0
-                    ? "text-green-400"
-                    : p.realized_pl < 0
-                      ? "text-red-400"
-                      : "text-neutral-500"
-                }`}
+          {sorted.map((p, i) => {
+            const isLink = analyzedTickers.has(p.symbol);
+            const status = analysisStatus[p.symbol] ?? "idle";
+
+            return (
+              <tr
+                key={`${p.account}-${p.symbol}-${i}`}
+                className="border-b border-neutral-800/50 last:border-0 hover:bg-neutral-800/30"
               >
-                {p.realized_pl >= 0 ? "+" : ""}${fmt(p.realized_pl)}
-              </td>
-              <td className="max-w-48 truncate px-4 py-3 text-neutral-400">
-                {p.name}
-              </td>
-              <td className="px-4 py-3 text-neutral-500">{p.asset_type}</td>
-            </tr>
-          ))}
+                <td className="w-24 px-4 py-3 text-neutral-400">{p.account}</td>
+                <td className="w-48 max-w-48 truncate px-4 py-3 text-neutral-400">
+                  {isLink ? (
+                    <Link
+                      href={`/company/${p.symbol}`}
+                      className="text-blue-400 hover:text-blue-300 hover:underline"
+                    >
+                      {p.name}
+                    </Link>
+                  ) : (
+                    p.name
+                  )}
+                </td>
+                <td className="w-20 px-4 py-3 font-semibold text-neutral-100">
+                  {p.symbol}
+                </td>
+                <td className="w-24 px-4 py-3 text-neutral-500">
+                  {p.asset_type}
+                </td>
+                <td className="px-4 py-3 text-right text-neutral-200">
+                  {fmt(p.shares_held, p.shares_held % 1 === 0 ? 0 : 4)}
+                </td>
+                <td className="px-4 py-3 text-right text-neutral-200">
+                  ${fmt(p.avg_cost_per_share, 4)}
+                </td>
+                <td className="px-4 py-3 text-right text-neutral-200">
+                  ${fmt(p.cost_basis)}
+                </td>
+                <td
+                  className={`px-4 py-3 text-right ${
+                    p.realized_pl > 0
+                      ? "text-green-400"
+                      : p.realized_pl < 0
+                        ? "text-red-400"
+                        : "text-neutral-500"
+                  }`}
+                >
+                  {p.realized_pl >= 0 ? "+" : ""}${fmt(p.realized_pl)}
+                </td>
+                {showStatusColumn && (
+                  <td className="w-8 px-4 py-3 text-center">
+                    <StatusCell status={status} />
+                  </td>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
