@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import type { SymbolMetadata } from "./ChartsSection";
 
 export interface Position {
   account: string;
@@ -53,6 +54,7 @@ interface Props {
   positions: Position[];
   analysisStatus?: Record<string, AnalysisStatus>;
   analyzedTickers?: Set<string>;
+  symbolMetadata?: Record<string, SymbolMetadata>;
 }
 
 function fmt(n: number, decimals = 2): string {
@@ -77,10 +79,18 @@ function StatusCell({ status }: { status: AnalysisStatus }) {
   return null;
 }
 
+function sectorLabel(meta: SymbolMetadata | undefined): string {
+  if (!meta) return "";
+  if (meta.asset_type === "ETF") return "ETF";
+  if (meta.sector) return meta.sector;
+  return "—";
+}
+
 export default function PositionsTable({
   positions,
   analysisStatus = {},
   analyzedTickers = new Set(),
+  symbolMetadata = {},
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -149,6 +159,7 @@ export default function PositionsTable({
                 </button>
               </th>
             ))}
+            <th className="w-28 px-4 py-3 text-neutral-500">Sector</th>
             {showStatusColumn && <th className="w-8 px-4 py-3" />}
           </tr>
         </thead>
@@ -200,6 +211,9 @@ export default function PositionsTable({
                   }`}
                 >
                   {p.realized_pl >= 0 ? "+" : ""}${fmt(p.realized_pl)}
+                </td>
+                <td className="w-28 px-4 py-3 text-neutral-500">
+                  {sectorLabel(symbolMetadata[p.symbol])}
                 </td>
                 {showStatusColumn && (
                   <td className="w-8 px-4 py-3 text-center">

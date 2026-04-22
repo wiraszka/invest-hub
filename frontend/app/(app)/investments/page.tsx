@@ -1,23 +1,31 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useCallback, useEffect, useRef, useState } from "react";
-import ChartsSection, {
-  type SymbolMetadata,
-} from "@/components/investments/ChartsSection";
+import { useCallback, useEffect, useState } from "react";
+import type { SymbolMetadata } from "@/components/investments/ChartsSection";
+import ChartsSection from "@/components/investments/ChartsSection";
 import CsvDropzone from "@/components/investments/CsvDropzone";
 import PositionsTable, {
-  type AnalysisStatus,
   type Position,
 } from "@/components/investments/PositionsTable";
 import TransactionsTable, {
   type Transaction,
 } from "@/components/investments/TransactionsTable";
+import { useAnalyze } from "@/contexts/AnalyzeContext";
 
 type View = "positions" | "transactions";
 
 export default function InvestmentsPage() {
   const { userId } = useAuth();
+  const {
+    symbolMetadata,
+    setSymbolMetadata,
+    analysisStatus,
+    analyzedTickers,
+    setAnalyzedTickers,
+    analyzing,
+    startAnalyze,
+  } = useAnalyze();
 
   const [positions, setPositions] = useState<Position[] | null>(null);
   const [transactions, setTransactions] = useState<Transaction[] | null>(null);
@@ -25,19 +33,6 @@ export default function InvestmentsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasData, setHasData] = useState(false);
-
-  const [symbolMetadata, setSymbolMetadata] = useState<
-    Record<string, SymbolMetadata>
-  >({});
-  const [analysisStatus, setAnalysisStatus] = useState<
-    Record<string, AnalysisStatus>
-  >({});
-  const [analyzedTickers, setAnalyzedTickers] = useState<Set<string>>(
-    new Set(),
-  );
-  const [analyzing, setAnalyzing] = useState(false);
-
-  const analyzeAbortRef = useRef(false);
 
   const base = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -93,57 +88,20 @@ export default function InvestmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [userId, base]);
+  }, [userId, base, setSymbolMetadata, setAnalyzedTickers]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function handleAnalyze() {
-    if (!positions) return;
-
+  function handleAnalyze() {
+    if (!positions || !base) return;
     const tickers = [
       ...new Set(
         positions.filter((p) => p.account !== "Crypto").map((p) => p.symbol),
       ),
     ];
-
-    setAnalyzing(true);
-    analyzeAbortRef.current = false;
-
-    const initialStatus: Record<string, AnalysisStatus> = {};
-    for (const t of tickers) initialStatus[t] = "idle";
-    setAnalysisStatus(initialStatus);
-
-    for (const ticker of tickers) {
-      if (analyzeAbortRef.current) break;
-
-      setAnalysisStatus((prev) => ({ ...prev, [ticker]: "loading" }));
-
-      try {
-        const [metaRes, analysisRes] = await Promise.all([
-          fetch(`${base}/api/investments/metadata/${ticker}`, {
-            method: "POST",
-          }),
-          fetch(`${base}/api/analysis/${ticker}`, { method: "POST" }),
-        ]);
-
-        if (metaRes.ok) {
-          const meta: SymbolMetadata = await metaRes.json();
-          setSymbolMetadata((prev) => ({ ...prev, [ticker]: meta }));
-        }
-
-        if (analysisRes.ok) {
-          setAnalyzedTickers((prev) => new Set([...prev, ticker]));
-        }
-
-        setAnalysisStatus((prev) => ({ ...prev, [ticker]: "done" }));
-      } catch {
-        setAnalysisStatus((prev) => ({ ...prev, [ticker]: "error" }));
-      }
-    }
-
-    setAnalyzing(false);
+    startAnalyze(tickers, base);
   }
 
   const equityPositions =
@@ -234,6 +192,7 @@ export default function InvestmentsPage() {
                       positions={equityPositions}
                       analysisStatus={analysisStatus}
                       analyzedTickers={analyzedTickers}
+                      symbolMetadata={symbolMetadata}
                     />
                   </section>
                   <section className="flex flex-col gap-4">
@@ -248,6 +207,7 @@ export default function InvestmentsPage() {
                   positions={equityPositions}
                   analysisStatus={analysisStatus}
                   analyzedTickers={analyzedTickers}
+                  symbolMetadata={symbolMetadata}
                 />
               )}
             </div>
