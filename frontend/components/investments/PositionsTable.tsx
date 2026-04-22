@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { canonicalTicker } from "./ChartsSection";
 import type { SymbolMetadata } from "./ChartsSection";
 
 export interface Position {
@@ -184,8 +185,13 @@ export default function PositionsTable({
         </thead>
         <tbody>
           {sorted.map((p, i) => {
-            const isLink = analyzedTickers.has(p.symbol);
-            const status = analysisStatus[p.symbol] ?? "idle";
+            const isLink = analyzedTickers.has(
+              canonicalTicker(p.symbol, p.currency),
+            );
+            const status =
+              analysisStatus[canonicalTicker(p.symbol, p.currency)] ?? "idle";
+
+            const cticker = canonicalTicker(p.symbol, p.currency);
 
             return (
               <tr
@@ -196,7 +202,7 @@ export default function PositionsTable({
                 <td className="w-48 max-w-48 truncate px-4 py-3 text-neutral-400">
                   {isLink ? (
                     <Link
-                      href={`/company/${p.symbol}`}
+                      href={`/company/${cticker}`}
                       className="text-blue-400 hover:text-blue-300 hover:underline"
                     >
                       {p.name}
@@ -212,7 +218,9 @@ export default function PositionsTable({
                   {p.asset_type}
                 </td>
                 <td className="w-28 px-4 py-3 text-neutral-500">
-                  {sectorLabel(symbolMetadata[p.symbol])}
+                  {sectorLabel(
+                    symbolMetadata[canonicalTicker(p.symbol, p.currency)],
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right text-neutral-200">
                   {fmt(p.shares_held, p.shares_held % 1 === 0 ? 0 : 4)}

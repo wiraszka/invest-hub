@@ -64,10 +64,11 @@ export function AnalyzeProvider({ children }: { children: ReactNode }) {
           setSymbolMetadata((prev) => ({ ...prev, [ticker]: meta }));
         }
 
-        setAnalyzedTickers((prev) => new Set([...prev, ticker]));
         setAnalysisStatus((prev) => ({ ...prev, [ticker]: "done" }));
       } catch {
         setAnalysisStatus((prev) => ({ ...prev, [ticker]: "error" }));
+      } finally {
+        setAnalyzedTickers((prev) => new Set([...prev, ticker]));
       }
     }
 

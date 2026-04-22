@@ -2,7 +2,10 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useCallback, useEffect, useState } from "react";
-import type { SymbolMetadata } from "@/components/investments/ChartsSection";
+import {
+  canonicalTicker,
+  type SymbolMetadata,
+} from "@/components/investments/ChartsSection";
 import ChartsSection from "@/components/investments/ChartsSection";
 import CsvDropzone from "@/components/investments/CsvDropzone";
 import PositionsTable, {
@@ -63,7 +66,9 @@ export default function InvestmentsPage() {
 
       const nonCryptoTickers = [
         ...new Set(
-          posData.filter((p) => p.account !== "Crypto").map((p) => p.symbol),
+          posData
+            .filter((p) => p.account !== "Crypto")
+            .map((p) => canonicalTicker(p.symbol, p.currency)),
         ),
       ];
 
@@ -98,7 +103,9 @@ export default function InvestmentsPage() {
     if (!positions || !base) return;
     const tickers = [
       ...new Set(
-        positions.filter((p) => p.account !== "Crypto").map((p) => p.symbol),
+        positions
+          .filter((p) => p.account !== "Crypto")
+          .map((p) => canonicalTicker(p.symbol, p.currency)),
       ),
     ];
     startAnalyze(tickers, base);
