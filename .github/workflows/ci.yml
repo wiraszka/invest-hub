@@ -32,6 +32,10 @@ jobs:
 
       - name: Run tests
         run: pytest
+        env:
+          FMP_API_KEY: test_key
+          TD_API_KEY: test_key
+          ANTHROPIC_API_KEY: test_key
 
   frontend:
     name: Frontend — typecheck + lint + test
