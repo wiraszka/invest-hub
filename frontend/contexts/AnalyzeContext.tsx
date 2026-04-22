@@ -62,9 +62,9 @@ export function AnalyzeProvider({ children }: { children: ReactNode }) {
         if (metaRes.ok) {
           const meta: SymbolMetadata = await metaRes.json();
           setSymbolMetadata((prev) => ({ ...prev, [ticker]: meta }));
-          setAnalyzedTickers((prev) => new Set([...prev, ticker]));
         }
 
+        setAnalyzedTickers((prev) => new Set([...prev, ticker]));
         setAnalysisStatus((prev) => ({ ...prev, [ticker]: "done" }));
       } catch {
         setAnalysisStatus((prev) => ({ ...prev, [ticker]: "error" }));
