@@ -208,6 +208,41 @@ def test_get_positions_returns_list():
     assert data[0]["symbol"] == "VFV"
 
 
+def test_metadata_falls_back_to_sec_when_fmp_returns_none():
+    sec_meta = {
+        "asset_type": "Equity",
+        "sector": "Crude Petroleum and Natural Gas",
+        "country": "Canada",
+        "sector_weights": None,
+        "country_weights": None,
+    }
+
+    with (
+        patch("routers.investments.get_symbol_metadata", return_value=None),
+        patch("routers.investments.fetch_from_fmp", return_value=None),
+        patch("routers.investments.fetch_from_sec", return_value=sec_meta),
+        patch("routers.investments.upsert_symbol_metadata"),
+        patch("routers.investments.get_analysis", return_value=None),
+    ):
+        response = client.post("/api/investments/metadata/AVN")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["sector"] == "Crude Petroleum and Natural Gas"
+    assert data["country"] == "Canada"
+
+
+def test_metadata_returns_404_when_both_fmp_and_sec_fail():
+    with (
+        patch("routers.investments.get_symbol_metadata", return_value=None),
+        patch("routers.investments.fetch_from_fmp", return_value=None),
+        patch("routers.investments.fetch_from_sec", return_value=None),
+    ):
+        response = client.post("/api/investments/metadata/ZZZZ")
+
+    assert response.status_code == 404
+
+
 def test_get_transactions_returns_list():
     mock_txns = [
         {
