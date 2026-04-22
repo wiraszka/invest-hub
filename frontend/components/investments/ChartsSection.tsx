@@ -5,7 +5,7 @@ import type { Position } from "./PositionsTable";
 
 export interface SymbolMetadata {
   ticker: string;
-  fmp_ticker: string;
+  fmp_ticker?: string;
   asset_type: string;
   sector: string | null;
   country: string | null;
@@ -13,6 +13,10 @@ export interface SymbolMetadata {
   country_weights: { country: string; weight: number }[] | null;
   has_analysis: boolean;
   fetched_at: string;
+}
+
+export function canonicalTicker(symbol: string, currency: string): string {
+  return currency === "CAD" ? `${symbol}.TO` : symbol;
 }
 
 interface Props {
@@ -55,7 +59,7 @@ function computeSector(
       accumulate(buckets, "Crypto", p.cost_basis);
       continue;
     }
-    const meta = metadata[p.symbol];
+    const meta = metadata[canonicalTicker(p.symbol, p.currency)];
     if (!meta) continue;
 
     if (meta.sector_weights) {
@@ -81,7 +85,7 @@ function computeGeography(
       accumulate(buckets, "Crypto", p.cost_basis);
       continue;
     }
-    const meta = metadata[p.symbol];
+    const meta = metadata[canonicalTicker(p.symbol, p.currency)];
     if (!meta) continue;
 
     if (meta.country_weights) {

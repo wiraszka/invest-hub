@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.11.0] - 2026-04-22
+
+### Fixed
+
+- Resolve Canadian tickers correctly by appending `.TO` to all CAD-currency positions before querying FMP and SEC — prevents collisions where a Canadian ticker shares the same symbol as a US company (e.g. ARX → ARC Resources, not Accelerant Holdings)
+- Reject SEC SIC fallback results for `.TO` tickers unless the matched company files a 40-F, preventing US ticker collisions from producing wrong sector data
+- Ensure all tickers become clickable links after Analyze even when the metadata request times out (moved `setAnalyzedTickers` to `finally` block)
+
 ## [v1.10.0] - 2026-04-22
 
 ### Added
