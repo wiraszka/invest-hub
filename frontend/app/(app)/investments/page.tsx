@@ -1,9 +1,13 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import ChartsSection, {
+  type SymbolMetadata,
+} from "@/components/investments/ChartsSection";
 import CsvDropzone from "@/components/investments/CsvDropzone";
 import PositionsTable, {
+  type AnalysisStatus,
   type Position,
 } from "@/components/investments/PositionsTable";
 import TransactionsTable, {
@@ -22,6 +26,21 @@ export default function InvestmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasData, setHasData] = useState(false);
 
+  const [symbolMetadata, setSymbolMetadata] = useState<
+    Record<string, SymbolMetadata>
+  >({});
+  const [analysisStatus, setAnalysisStatus] = useState<
+    Record<string, AnalysisStatus>
+  >({});
+  const [analyzedTickers, setAnalyzedTickers] = useState<Set<string>>(
+    new Set(),
+  );
+  const [analyzing, setAnalyzing] = useState(false);
+
+  const analyzeAbortRef = useRef(false);
+
+  const base = process.env.NEXT_PUBLIC_BACKEND_URL;
+
   const load = useCallback(async () => {
     if (!userId) return;
 
@@ -30,7 +49,6 @@ export default function InvestmentsPage() {
 
     try {
       const headers = { "X-User-Id": userId };
-      const base = process.env.NEXT_PUBLIC_BACKEND_URL;
 
       const [posRes, txnRes] = await Promise.all([
         fetch(`${base}/api/investments/positions`, { headers }),
@@ -47,22 +65,93 @@ export default function InvestmentsPage() {
       setPositions(posData);
       setTransactions(txnData);
       setHasData(txnData.length > 0);
+
+      const nonCryptoTickers = [
+        ...new Set(
+          posData.filter((p) => p.account !== "Crypto").map((p) => p.symbol),
+        ),
+      ];
+
+      if (nonCryptoTickers.length > 0) {
+        const metaRes = await fetch(
+          `${base}/api/investments/metadata?tickers=${nonCryptoTickers.join(",")}`,
+        );
+        if (metaRes.ok) {
+          const metaData: Record<string, SymbolMetadata> = await metaRes.json();
+          setSymbolMetadata(metaData);
+
+          const withAnalysis = new Set(
+            Object.values(metaData)
+              .filter((m) => m.has_analysis)
+              .map((m) => m.ticker),
+          );
+          setAnalyzedTickers(withAnalysis);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, base]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  async function handleAnalyze() {
+    if (!positions) return;
+
+    const tickers = [
+      ...new Set(
+        positions.filter((p) => p.account !== "Crypto").map((p) => p.symbol),
+      ),
+    ];
+
+    setAnalyzing(true);
+    analyzeAbortRef.current = false;
+
+    const initialStatus: Record<string, AnalysisStatus> = {};
+    for (const t of tickers) initialStatus[t] = "idle";
+    setAnalysisStatus(initialStatus);
+
+    for (const ticker of tickers) {
+      if (analyzeAbortRef.current) break;
+
+      setAnalysisStatus((prev) => ({ ...prev, [ticker]: "loading" }));
+
+      try {
+        const [metaRes, analysisRes] = await Promise.all([
+          fetch(`${base}/api/investments/metadata/${ticker}`, {
+            method: "POST",
+          }),
+          fetch(`${base}/api/analysis/${ticker}`, { method: "POST" }),
+        ]);
+
+        if (metaRes.ok) {
+          const meta: SymbolMetadata = await metaRes.json();
+          setSymbolMetadata((prev) => ({ ...prev, [ticker]: meta }));
+        }
+
+        if (analysisRes.ok) {
+          setAnalyzedTickers((prev) => new Set([...prev, ticker]));
+        }
+
+        setAnalysisStatus((prev) => ({ ...prev, [ticker]: "done" }));
+      } catch {
+        setAnalysisStatus((prev) => ({ ...prev, [ticker]: "error" }));
+      }
+    }
+
+    setAnalyzing(false);
+  }
 
   const equityPositions =
     positions?.filter((p) => p.account !== "Crypto") ?? [];
   const cryptoPositions =
     positions?.filter((p) => p.account === "Crypto") ?? [];
   const hasCrypto = cryptoPositions.length > 0;
+  const metadataReady = Object.keys(symbolMetadata).length > 0;
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl mx-auto">
@@ -94,26 +183,42 @@ export default function InvestmentsPage() {
 
       {!loading && hasData && positions !== null && transactions !== null && (
         <>
-          <div className="flex gap-2">
+          <ChartsSection
+            positions={positions}
+            symbolMetadata={symbolMetadata}
+            metadataReady={metadataReady}
+          />
+
+          <div className="flex items-center gap-4">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setView("positions")}
+                className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                  view === "positions"
+                    ? "bg-neutral-700 text-white"
+                    : "text-neutral-400 hover:text-neutral-200"
+                }`}
+              >
+                Positions
+              </button>
+              <button
+                onClick={() => setView("transactions")}
+                className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                  view === "transactions"
+                    ? "bg-neutral-700 text-white"
+                    : "text-neutral-400 hover:text-neutral-200"
+                }`}
+              >
+                All Transactions
+              </button>
+            </div>
+
             <button
-              onClick={() => setView("positions")}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                view === "positions"
-                  ? "bg-neutral-700 text-white"
-                  : "text-neutral-400 hover:text-neutral-200"
-              }`}
+              onClick={handleAnalyze}
+              disabled={analyzing}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Positions
-            </button>
-            <button
-              onClick={() => setView("transactions")}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                view === "transactions"
-                  ? "bg-neutral-700 text-white"
-                  : "text-neutral-400 hover:text-neutral-200"
-              }`}
-            >
-              All Transactions
+              {analyzing ? "Analyzing…" : "Analyze"}
             </button>
           </div>
 
@@ -125,7 +230,11 @@ export default function InvestmentsPage() {
                     <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
                       Equities &amp; ETFs
                     </h2>
-                    <PositionsTable positions={equityPositions} />
+                    <PositionsTable
+                      positions={equityPositions}
+                      analysisStatus={analysisStatus}
+                      analyzedTickers={analyzedTickers}
+                    />
                   </section>
                   <section className="flex flex-col gap-4">
                     <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
@@ -135,7 +244,11 @@ export default function InvestmentsPage() {
                   </section>
                 </>
               ) : (
-                <PositionsTable positions={equityPositions} />
+                <PositionsTable
+                  positions={equityPositions}
+                  analysisStatus={analysisStatus}
+                  analyzedTickers={analyzedTickers}
+                />
               )}
             </div>
           )}

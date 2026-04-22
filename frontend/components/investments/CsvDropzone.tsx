@@ -66,10 +66,10 @@ export default function CsvDropzone({ userId, onUpload }: Props) {
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-8 py-12 transition-colors ${
+        className={`flex cursor-pointer items-center gap-2 rounded-lg border border-dashed px-4 py-2 text-sm transition-colors ${
           dragging
-            ? "border-blue-400 bg-blue-400/5"
-            : "border-neutral-700 hover:border-neutral-500"
+            ? "border-blue-400 bg-blue-400/5 text-blue-400"
+            : "border-neutral-700 text-neutral-500 hover:border-neutral-500 hover:text-neutral-400"
         }`}
       >
         <input
@@ -80,16 +80,7 @@ export default function CsvDropzone({ userId, onUpload }: Props) {
           className="hidden"
           data-testid="csv-file-input"
         />
-        {loading ? (
-          <p className="text-sm text-neutral-400">Uploading…</p>
-        ) : (
-          <>
-            <p className="text-sm text-neutral-300">
-              Drag &amp; drop your Wealthsimple activities CSV here
-            </p>
-            <p className="text-xs text-neutral-500">or click to browse</p>
-          </>
-        )}
+        {loading ? <span>Uploading…</span> : <span>↑ Re-upload CSV</span>}
       </div>
       {error && (
         <p className="mt-2 text-center text-sm text-red-400">{error}</p>
