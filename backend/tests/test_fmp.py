@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from services.fmp import get_financials, get_profile_description, get_quote_price
 
 

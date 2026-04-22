@@ -27,7 +27,6 @@ export default function ResearchPanel({ ticker }: Props) {
   const base = process.env.NEXT_PUBLIC_BACKEND_URL;
 
   useEffect(() => {
-    setLoading(true);
     fetch(`${base}/api/analysis/${ticker}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data: AnalysisDoc | null) => setAnalysis(data))
