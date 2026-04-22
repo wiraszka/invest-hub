@@ -5,6 +5,8 @@ import os
 import requests
 from dotenv import load_dotenv
 
+from services.fmp import get_quote_price
+
 load_dotenv()
 
 TD_BASE = "https://api.twelvedata.com"
@@ -18,17 +20,25 @@ def _api_key() -> str:
 
 
 def get_current_price(ticker: str) -> dict:
-    """Return current price in USD for the given ticker."""
-    response = requests.get(
-        f"{TD_BASE}/price",
-        params={"symbol": ticker, "apikey": _api_key()},
-        timeout=10,
-    )
-    response.raise_for_status()
-    data = response.json()
-    if "price" not in data:
-        raise ValueError(data.get("message", "Unexpected response from TwelveData"))
-    return {"ticker": ticker, "price": float(data["price"])}
+    """Return current price for the given ticker. Falls back to FMP if TwelveData fails."""
+    try:
+        response = requests.get(
+            f"{TD_BASE}/price",
+            params={"symbol": ticker, "apikey": _api_key()},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if "price" in data:
+            return {"ticker": ticker, "price": float(data["price"])}
+    except Exception:
+        pass
+
+    fmp_price = get_quote_price(ticker)
+    if fmp_price is not None:
+        return {"ticker": ticker, "price": fmp_price}
+
+    raise ValueError(f"Could not retrieve price for {ticker} from any source")
 
 
 def get_price_history(ticker: str, days: int = 365) -> dict:

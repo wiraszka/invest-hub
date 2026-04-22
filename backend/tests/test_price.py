@@ -1,8 +1,10 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.index import app
+from services.price import get_current_price
 
 client = TestClient(app)
 
@@ -56,3 +58,51 @@ def test_price_history_returns_404_on_invalid_ticker():
         response = client.get("/api/price/INVALID/history")
 
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# get_current_price failover (service-level)
+# ---------------------------------------------------------------------------
+
+
+def _td_ok_response(price: float) -> MagicMock:
+    mock = MagicMock()
+    mock.raise_for_status = MagicMock()
+    mock.json.return_value = {"price": str(price)}
+    return mock
+
+
+def test_get_current_price_returns_twelvedata_price_when_available():
+    with patch("services.price.requests.get", return_value=_td_ok_response(18.42)):
+        result = get_current_price("NNE")
+
+    assert result["ticker"] == "NNE"
+    assert result["price"] == 18.42
+
+
+def test_get_current_price_falls_back_to_fmp_when_twelvedata_raises():
+    with patch("services.price.requests.get", side_effect=Exception("TD down")):
+        with patch("services.price.get_quote_price", return_value=42.50):
+            result = get_current_price("NNE")
+
+    assert result["ticker"] == "NNE"
+    assert result["price"] == 42.50
+
+
+def test_get_current_price_falls_back_to_fmp_when_twelvedata_returns_error_body():
+    bad_response = MagicMock()
+    bad_response.raise_for_status = MagicMock()
+    bad_response.json.return_value = {"message": "Invalid API key"}
+
+    with patch("services.price.requests.get", return_value=bad_response):
+        with patch("services.price.get_quote_price", return_value=42.50):
+            result = get_current_price("NNE")
+
+    assert result["price"] == 42.50
+
+
+def test_get_current_price_raises_when_both_sources_fail():
+    with patch("services.price.requests.get", side_effect=Exception("TD down")):
+        with patch("services.price.get_quote_price", return_value=None):
+            with pytest.raises(ValueError, match="price"):
+                get_current_price("NNE")

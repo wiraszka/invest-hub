@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.10.0] - 2026-04-22
+
+### Added
+
+- Restructure the research pipeline to use FMP as the primary financial data source — income statement, balance sheet, cash flow, and key metrics are fetched directly from FMP rather than extracted via XBRL
+- SEC filing retrieval is now a soft failure — when a CIK cannot be resolved the pipeline continues using the FMP company description as a narrative fallback and marks `data_source` as "FMP only"
+- Standard charts (capital structure, cash burn) are now computed directly from FMP data; LLM extraction is reserved for industry-specific charts (reserves, production, NAV) found in filing text
+- Add TwelveData → FMP price failover: live prices attempt TwelveData first and fall back to FMP quote endpoint on failure
+- Add Sector column to the Positions table — blank before Analyze is run, populated with sector label (or "ETF") once metadata is fetched
+- Lift analyze state into a React Context (`AnalyzeContext`) so the sequential metadata loop continues running when navigating away from the Investments page
+- Add `←` back button to the company page linking back to Investments
+- Replace placeholder "More Info" section on the company page with a Research Panel that fetches and renders the Company Snapshot, data source details, and filing metadata
+
+### Changed
+
+- Analyze button now only triggers FMP metadata lookup per ticker — the full LLM research pipeline is decoupled and will be triggered separately from the company page
+- `data_integrity` schema updated: remove `xbrl_quality`, add `data_source` ("SEC + FMP" / "FMP only") and `fmp_financials` ("full" / "partial" / "none") fields
+
 ## [v1.9.0] - 2026-04-21
 
 ### Added
@@ -189,6 +207,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.10.0]: https://github.com/wiraszka/invest-hub/compare/v1.9.0...v1.10.0
 [v1.9.0]: https://github.com/wiraszka/invest-hub/compare/v1.8.0...v1.9.0
 [v1.8.0]: https://github.com/wiraszka/invest-hub/compare/v1.7.0...v1.8.0
 [v1.7.0]: https://github.com/wiraszka/invest-hub/compare/v1.6.6...v1.7.0

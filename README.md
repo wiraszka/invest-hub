@@ -7,7 +7,7 @@ A personal investment research platform built on a FastAPI backend and Next.js f
 - **Research** — Search any SEC-registered company, trigger an LLM-driven analysis pipeline, and view a Company Snapshot, key financial metrics, charts, and a Data Integrity summary
 - **Commodities Sentiment** — Google Trends interest tracker for 11 commodities with a live line chart and momentum indicators
 - **Shortlist** — Save companies for quick re-access (in progress)
-- **Investments** — Personal portfolio tracking via Wealthsimple integration (in progress)
+- **Investments** — Personal portfolio tracking via Wealthsimple CSV import; positions table with sector labels, portfolio charts (asset type, sector, geography), and per-ticker metadata enrichment via FMP
 
 ## Tech Stack
 
@@ -18,8 +18,9 @@ A personal investment research platform built on a FastAPI backend and Next.js f
 | Database | MongoDB Atlas |
 | Auth | Clerk |
 | LLM | Claude API (Anthropic) |
-| Price Data | TwelveData API |
-| Filing Data | SEC EDGAR API (submissions + XBRL) |
+| Price Data | TwelveData API (FMP as failover) |
+| Financial Data | Financial Modeling Prep (FMP) API |
+| Filing Data | SEC EDGAR API (submissions + filing text) |
 | Sentiment Data | Google Trends (pytrends) |
 
 ## Project Structure
@@ -65,6 +66,7 @@ npm run dev
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `MONGODB_URI` | MongoDB Atlas connection string |
 | `TD_API_KEY` | TwelveData API key |
+| `FMP_API_KEY` | Financial Modeling Prep API key |
 
 ### Frontend (`frontend/.env.local`)
 
