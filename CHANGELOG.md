@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add sortable column headers to the Positions and Transactions tables — click once to sort, again to reverse, a third time to restore original order; numeric columns default to descending on first click
 - Split the Positions view into separate Equities & ETFs and Crypto tables when crypto holdings are detected
+- Add three portfolio donut charts above the Investments table: Asset Type (always visible), Sector, and Geography (populated after running Analyze)
+- Add Analyze button that sequentially runs FMP metadata lookup and LLM research pipeline for each equity position; each row shows a loading spinner while in progress and a checkmark on completion
+- Sector and Geography charts use ETF look-through via FMP sector and country weighting endpoints, distributing each ETF's cost basis proportionally across its underlying sectors and countries
+- Company names in the Positions table become clickable links to the Research page after a successful LLM analysis
+- Cache symbol metadata globally in a new `symbol_metadata` MongoDB collection with a 30-day TTL; charts hydrate instantly on subsequent page loads without re-running Analyze
+
+### Changed
+
+- Reorder TransactionsTable columns to align with Positions table layout (Account, Name, Symbol, Type, Date, Amount)
+- Replace the full-height CSV dropzone in the loaded state with a compact inline re-upload button aligned with the tab row
 
 ## [v1.8.0] - 2026-04-21
 
