@@ -9,8 +9,8 @@ from services.db import (
     upsert_symbol_metadata,
 )
 from services.fmp import get_symbol_metadata as fetch_from_fmp
-from services.sec import get_sic_metadata as fetch_from_sec
 from services.investments import build_positions, parse_csv
+from services.sec import get_sic_metadata as fetch_from_sec
 
 router = APIRouter()
 
