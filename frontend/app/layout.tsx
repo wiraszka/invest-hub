@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "invest-hub",
+  title: "InvestHub",
   description: "Personal investment research platform",
 };
 
