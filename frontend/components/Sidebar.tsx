@@ -18,7 +18,7 @@ export default function Sidebar() {
   return (
     <aside className="flex flex-col w-64 min-h-screen bg-neutral-950 border-r border-neutral-800 px-6 py-8 shrink-0">
       <div className="text-2xl font-extrabold tracking-wide text-white mb-8">
-        invest-hub
+        InvestHub
       </div>
 
       <nav className="flex flex-col gap-1 flex-1">
