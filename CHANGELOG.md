@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.14.0] - 2026-05-11
+
+### Added
+
+- Support Wealthsimple holdings CSV upload — auto-detected on upload alongside the existing activities CSV; provides live market price, market value (CAD), and unrealized P/L per position with automatic currency conversion for USD positions
+- Add market price, market value, unrealized P/L, unrealized %, total return, total %, and portfolio weight % columns to the Positions table — populated when holdings data is present
+- Add column manager (Columns button) to show or hide any column in the Positions table
+- Add editable Industry column to the Positions table — manually entered values persist to MongoDB and populate the Industry donut chart
+- Add Sector / Industry toggle on the middle portfolio donut chart
+- Add Cost Basis / Market Value toggle above the portfolio charts — switches all three donut charts to use live market value instead of cost basis when holdings data is present
+- Display two upload chips in the Positions header (Activities and Holdings), each showing a checkmark when data is loaded
+- Clean option symbols to show only the underlying ticker (e.g. QQQ) with contract details (Put/Call, strike, expiry) as a subtitle beneath the position name
+
+### Fixed
+
+- Remove personal email from source code — SEC EDGAR contact email is now read from the `SEC_CONTACT_EMAIL` environment variable
+
 ## [v1.13.0] - 2026-05-11
 
 ### Added
@@ -244,6 +261,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.14.0]: https://github.com/wiraszka/invest-hub/compare/v1.13.0...v1.14.0
 [v1.13.0]: https://github.com/wiraszka/invest-hub/compare/v1.12.0...v1.13.0
 [v1.12.0]: https://github.com/wiraszka/invest-hub/compare/v1.11.0...v1.12.0
 [v1.11.0]: https://github.com/wiraszka/invest-hub/compare/v1.10.0...v1.11.0
