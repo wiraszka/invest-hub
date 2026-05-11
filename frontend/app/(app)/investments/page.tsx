@@ -8,6 +8,7 @@ import {
 } from "@/components/investments/ChartsSection";
 import ChartsSection from "@/components/investments/ChartsSection";
 import CsvDropzone from "@/components/investments/CsvDropzone";
+import GroupsPopover from "@/components/investments/GroupsPopover";
 import PositionsTable, {
   type Position,
 } from "@/components/investments/PositionsTable";
@@ -44,7 +45,6 @@ export default function InvestmentsPage() {
   const [sectorOverrides, setSectorOverrides] = useState<
     Record<string, string>
   >({});
-  const [newGroupName, setNewGroupName] = useState("");
 
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -134,13 +134,20 @@ export default function InvestmentsPage() {
     }, 300);
   }
 
-  function handleAddGroup() {
-    const name = newGroupName.trim();
-    if (!name || groupingLabels.includes(name)) return;
+  function handleAddGroup(name: string) {
     const next = [...groupingLabels, name];
     setGroupingLabels(next);
-    setNewGroupName("");
     savePreferences(next, groupingAssignments, sectorOverrides);
+  }
+
+  function handleRemoveGroup(name: string) {
+    const nextLabels = groupingLabels.filter((g) => g !== name);
+    const nextAssignments = Object.fromEntries(
+      Object.entries(groupingAssignments).filter(([, v]) => v !== name),
+    );
+    setGroupingLabels(nextLabels);
+    setGroupingAssignments(nextAssignments);
+    savePreferences(nextLabels, nextAssignments, sectorOverrides);
   }
 
   function handleGroupingChange(posKey: string, group: string) {
@@ -248,25 +255,12 @@ export default function InvestmentsPage() {
               {analyzing ? "Analyzing…" : "Analyze"}
             </button>
 
-            <div className="ml-auto flex items-center gap-2">
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddGroup()}
-                placeholder="New group…"
-                className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-neutral-500"
+            <div className="ml-auto">
+              <GroupsPopover
+                groupingLabels={groupingLabels}
+                onAdd={handleAddGroup}
+                onRemove={handleRemoveGroup}
               />
-              <button
-                onClick={handleAddGroup}
-                disabled={
-                  !newGroupName.trim() ||
-                  groupingLabels.includes(newGroupName.trim())
-                }
-                className="rounded-md bg-neutral-700 px-3 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Add group
-              </button>
             </div>
           </div>
 
