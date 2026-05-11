@@ -120,6 +120,36 @@ def invalidate_positions_cache(user_id: str) -> None:
     _positions_collection().delete_one({"user_id": user_id})
 
 
+# ---------------------------------------------------------------------------
+# User preferences (groupings + sector overrides)
+# ---------------------------------------------------------------------------
+
+_DEFAULT_PREFERENCES: dict = {
+    "grouping_labels": [],
+    "grouping_assignments": {},
+    "sector_overrides": {},
+}
+
+
+def get_user_preferences(user_id: str) -> dict:
+    doc = _preferences_collection().find_one(
+        {"user_id": user_id}, {"_id": 0, "user_id": 0}
+    )
+    return doc if doc else dict(_DEFAULT_PREFERENCES)
+
+
+def upsert_user_preferences(user_id: str, prefs: dict) -> None:
+    _preferences_collection().replace_one(
+        {"user_id": user_id},
+        {"user_id": user_id, **prefs},
+        upsert=True,
+    )
+
+
+def _preferences_collection() -> Collection:
+    return _db()["user_preferences"]
+
+
 def _symbol_metadata_collection() -> Collection:
     return _db()["symbol_metadata"]
 
