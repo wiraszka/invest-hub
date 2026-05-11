@@ -30,6 +30,10 @@ def _trends_collection() -> Collection:
     return _db()["trends_cache"]
 
 
+def _positions_collection() -> Collection:
+    return _db()["positions_cache"]
+
+
 # ---------------------------------------------------------------------------
 # Analyses
 # ---------------------------------------------------------------------------
@@ -68,7 +72,7 @@ def upsert_analysis(
 
 
 def get_trends_cache(cache_key: str) -> dict | None:
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=12)
     doc = _trends_collection().find_one(
         {"cache_key": cache_key, "cached_at": {"$gte": cutoff}},
         {"_id": 0},
@@ -94,6 +98,28 @@ def _transactions_collection() -> Collection:
     return _db()["transactions"]
 
 
+# ---------------------------------------------------------------------------
+# Positions cache
+# ---------------------------------------------------------------------------
+
+
+def get_positions_cache(user_id: str) -> list[dict] | None:
+    doc = _positions_collection().find_one({"user_id": user_id}, {"_id": 0})
+    return doc["positions"] if doc else None
+
+
+def set_positions_cache(user_id: str, positions: list[dict]) -> None:
+    _positions_collection().replace_one(
+        {"user_id": user_id},
+        {"user_id": user_id, "positions": positions},
+        upsert=True,
+    )
+
+
+def invalidate_positions_cache(user_id: str) -> None:
+    _positions_collection().delete_one({"user_id": user_id})
+
+
 def _symbol_metadata_collection() -> Collection:
     return _db()["symbol_metadata"]
 
@@ -112,17 +138,17 @@ def replace_transactions(user_id: str, transactions: list[dict]) -> None:
 
 def get_transactions(user_id: str) -> list[dict]:
     return list(
-        _transactions_collection().find(
+        _transactions_collection()
+        .find(
             {"user_id": user_id},
             {"_id": 0, "user_id": 0},
-        ).sort("transaction_date", -1)
+        )
+        .sort("transaction_date", -1)
     )
 
 
 def has_transactions(user_id: str) -> bool:
-    return (
-        _transactions_collection().count_documents({"user_id": user_id}, limit=1) > 0
-    )
+    return _transactions_collection().count_documents({"user_id": user_id}, limit=1) > 0
 
 
 # ---------------------------------------------------------------------------
