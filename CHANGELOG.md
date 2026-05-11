@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.12.0] - 2026-05-10
+
+### Added
+
+- Cache aggregated portfolio positions per user in MongoDB — subsequent loads skip re-aggregation and read directly from cache; cache is invalidated automatically on CSV upload
+
+### Fixed
+
+- Resolve Commodities Sentiment chart failures caused by Google Trends rate limiting (429) — extend cache TTL from 1 hour to 12 hours and increase pytrends retry backoff from 0.5s to 2s (exponential: up to 32s)
+
 ## [v1.11.0] - 2026-04-26
 
 ### Changed
@@ -226,6 +236,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.12.0]: https://github.com/wiraszka/invest-hub/compare/v1.11.0...v1.12.0
+[v1.11.0]: https://github.com/wiraszka/invest-hub/compare/v1.10.0...v1.11.0
 [v1.10.0]: https://github.com/wiraszka/invest-hub/compare/v1.9.0...v1.10.0
 [v1.9.0]: https://github.com/wiraszka/invest-hub/compare/v1.8.0...v1.9.0
 [v1.8.0]: https://github.com/wiraszka/invest-hub/compare/v1.7.0...v1.8.0

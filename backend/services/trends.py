@@ -41,8 +41,8 @@ def fetch_trends_data(
     pytrends = TrendReq(
         hl="en-US",
         tz=360,
-        retries=2,
-        backoff_factor=0.5,
+        retries=5,
+        backoff_factor=2,
         requests_args={
             "headers": {
                 "User-Agent": (
