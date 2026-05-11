@@ -28,7 +28,7 @@ export default function ResearchPanel({ ticker }: Props) {
 
   useEffect(() => {
     fetch(`${base}/api/analysis/${ticker}`)
-      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => (res.ok ? res.json() : null))
       .then((data: AnalysisDoc | null) => setAnalysis(data))
       .catch(() => setAnalysis(null))
       .finally(() => setLoading(false));

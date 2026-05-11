@@ -45,8 +45,8 @@ function typeBadgeClass(t: Transaction): string {
   return "text-neutral-400";
 }
 
-function fmt(n: number): string {
-  return n.toLocaleString("en-CA", {
+function fmt(value: number): string {
+  return value.toLocaleString("en-CA", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
