@@ -275,3 +275,78 @@ def test_get_transactions_returns_list():
 
     assert response.status_code == 200
     assert response.json()[0]["symbol"] == "VFV"
+
+
+# ---------------------------------------------------------------------------
+# Preferences
+# ---------------------------------------------------------------------------
+
+
+def test_get_preferences_requires_user_id():
+    response = client.get("/api/investments/preferences")
+
+    assert response.status_code == 401
+
+
+def test_get_preferences_returns_defaults_when_none_stored():
+    with patch(
+        "routers.investments.get_user_preferences",
+        return_value={
+            "grouping_labels": [],
+            "grouping_assignments": {},
+            "sector_overrides": {},
+        },
+    ):
+        response = client.get(
+            "/api/investments/preferences",
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["grouping_labels"] == []
+    assert data["grouping_assignments"] == {}
+    assert data["sector_overrides"] == {}
+
+
+def test_put_preferences_requires_user_id():
+    response = client.put(
+        "/api/investments/preferences",
+        json={"grouping_labels": ["Tech"]},
+    )
+
+    assert response.status_code == 401
+
+
+def test_put_preferences_persists_and_returns_prefs():
+    prefs = {
+        "grouping_labels": ["Tech", "Mining"],
+        "grouping_assignments": {"TFSA::VFV": "Tech"},
+        "sector_overrides": {"TFSA::ARX": "Oil & Gas"},
+    }
+
+    with patch("routers.investments.upsert_user_preferences") as mock_upsert:
+        response = client.put(
+            "/api/investments/preferences",
+            json=prefs,
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["grouping_labels"] == ["Tech", "Mining"]
+    assert data["grouping_assignments"] == {"TFSA::VFV": "Tech"}
+    assert data["sector_overrides"] == {"TFSA::ARX": "Oil & Gas"}
+    mock_upsert.assert_called_once()
+
+
+def test_put_preferences_strips_unknown_keys():
+    with patch("routers.investments.upsert_user_preferences"):
+        response = client.put(
+            "/api/investments/preferences",
+            json={"grouping_labels": ["Tech"], "malicious_key": "bad"},
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    assert response.status_code == 200
+    assert "malicious_key" not in response.json()
