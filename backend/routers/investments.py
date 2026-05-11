@@ -2,10 +2,13 @@ from fastapi import APIRouter, File, Header, HTTPException, Path, Query, UploadF
 
 from services.db import (
     get_analysis,
+    get_positions_cache,
     get_symbol_metadata,
     get_symbol_metadata_batch,
     get_transactions,
+    invalidate_positions_cache,
     replace_transactions,
+    set_positions_cache,
     upsert_symbol_metadata,
 )
 from services.fmp import get_symbol_metadata as fetch_from_fmp
@@ -30,6 +33,7 @@ async def upload_transactions(
     content = (await file.read()).decode("utf-8")
     transactions = parse_csv(content)
     replace_transactions(user_id, transactions)
+    invalidate_positions_cache(user_id)
     return {"count": len(transactions)}
 
 
@@ -38,8 +42,13 @@ def get_positions(
     x_user_id: str | None = Header(default=None),
 ) -> list[dict]:
     user_id = _require_user(x_user_id)
+    cached = get_positions_cache(user_id)
+    if cached is not None:
+        return cached
     transactions = get_transactions(user_id)
-    return build_positions(transactions)
+    positions = build_positions(transactions)
+    set_positions_cache(user_id, positions)
+    return positions
 
 
 @router.get("/api/investments/transactions")
