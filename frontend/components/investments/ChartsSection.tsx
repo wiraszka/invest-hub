@@ -23,6 +23,8 @@ interface Props {
   positions: Position[];
   symbolMetadata: Record<string, SymbolMetadata>;
   metadataReady: boolean;
+  groupingAssignments: Record<string, string>;
+  sectorOverrides: Record<string, string>;
 }
 
 function accumulate(
@@ -52,6 +54,7 @@ function computeAssetType(positions: Position[]) {
 function computeSector(
   positions: Position[],
   metadata: Record<string, SymbolMetadata>,
+  sectorOverrides: Record<string, string>,
 ) {
   const buckets: Record<string, number> = {};
   for (const p of positions) {
@@ -59,9 +62,14 @@ function computeSector(
       accumulate(buckets, "Crypto", p.cost_basis);
       continue;
     }
+    const key = `${p.account}::${p.symbol}`;
+    const override = sectorOverrides[key]?.trim();
+    if (override) {
+      accumulate(buckets, override, p.cost_basis);
+      continue;
+    }
     const meta = metadata[canonicalTicker(p.symbol, p.currency)];
     if (!meta) continue;
-
     if (meta.sector_weights) {
       for (const sw of meta.sector_weights) {
         accumulate(buckets, sw.sector, p.cost_basis * (sw.weight / 100));
@@ -75,28 +83,16 @@ function computeSector(
   return toSlices(buckets);
 }
 
-function computeGeography(
+function computeGroupings(
   positions: Position[],
-  metadata: Record<string, SymbolMetadata>,
+  assignments: Record<string, string>,
 ) {
   const buckets: Record<string, number> = {};
   for (const p of positions) {
-    if (p.account === "Crypto") {
-      accumulate(buckets, "Crypto", p.cost_basis);
-      continue;
-    }
-    const meta = metadata[canonicalTicker(p.symbol, p.currency)];
-    if (!meta) continue;
-
-    if (meta.country_weights) {
-      for (const cw of meta.country_weights) {
-        accumulate(buckets, cw.country, p.cost_basis * (cw.weight / 100));
-      }
-    } else if (meta.country) {
-      accumulate(buckets, meta.country, p.cost_basis);
-    } else {
-      accumulate(buckets, "Other", p.cost_basis);
-    }
+    const key = `${p.account}::${p.symbol}`;
+    const group = assignments[key];
+    if (!group) continue;
+    accumulate(buckets, group, p.cost_basis);
   }
   return toSlices(buckets);
 }
@@ -104,11 +100,12 @@ function computeGeography(
 export default function ChartsSection({
   positions,
   symbolMetadata,
-  metadataReady,
+  groupingAssignments,
+  sectorOverrides,
 }: Props) {
   const assetTypeData = computeAssetType(positions);
-  const sectorData = computeSector(positions, symbolMetadata);
-  const geoData = computeGeography(positions, symbolMetadata);
+  const sectorData = computeSector(positions, symbolMetadata, sectorOverrides);
+  const groupingsData = computeGroupings(positions, groupingAssignments);
 
   return (
     <div className="flex gap-8">
@@ -121,14 +118,14 @@ export default function ChartsSection({
       <DonutChart
         title="Sector"
         data={sectorData}
-        ready={metadataReady && sectorData.length > 0}
-        placeholderText="Click Analyze below to see sector breakdown"
+        ready={sectorData.length > 0}
+        placeholderText="Run Analyze or enter sectors in the table"
       />
       <DonutChart
-        title="Geography"
-        data={geoData}
-        ready={metadataReady && geoData.length > 0}
-        placeholderText="Click Analyze below to see geographic breakdown"
+        title="Groupings"
+        data={groupingsData}
+        ready={groupingsData.length > 0}
+        placeholderText="Assign groupings in the table below"
       />
     </div>
   );

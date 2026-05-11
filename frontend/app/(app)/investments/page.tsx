@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   canonicalTicker,
   type SymbolMetadata,
@@ -37,6 +37,17 @@ export default function InvestmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasData, setHasData] = useState(false);
 
+  const [groupingLabels, setGroupingLabels] = useState<string[]>([]);
+  const [groupingAssignments, setGroupingAssignments] = useState<
+    Record<string, string>
+  >({});
+  const [sectorOverrides, setSectorOverrides] = useState<
+    Record<string, string>
+  >({});
+  const [newGroupName, setNewGroupName] = useState("");
+
+  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const base = process.env.NEXT_PUBLIC_BACKEND_URL;
 
   const load = useCallback(async () => {
@@ -48,9 +59,10 @@ export default function InvestmentsPage() {
     try {
       const headers = { "X-User-Id": userId };
 
-      const [posRes, txnRes] = await Promise.all([
+      const [posRes, txnRes, prefRes] = await Promise.all([
         fetch(`${base}/api/investments/positions`, { headers }),
         fetch(`${base}/api/investments/transactions`, { headers }),
+        fetch(`${base}/api/investments/preferences`, { headers }),
       ]);
 
       if (!posRes.ok || !txnRes.ok) {
@@ -63,6 +75,13 @@ export default function InvestmentsPage() {
       setPositions(posData);
       setTransactions(txnData);
       setHasData(txnData.length > 0);
+
+      if (prefRes.ok) {
+        const prefs = await prefRes.json();
+        setGroupingLabels(prefs.grouping_labels ?? []);
+        setGroupingAssignments(prefs.grouping_assignments ?? {});
+        setSectorOverrides(prefs.sector_overrides ?? {});
+      }
 
       const nonCryptoTickers = [
         ...new Set(
@@ -94,6 +113,47 @@ export default function InvestmentsPage() {
       setLoading(false);
     }
   }, [userId, base, setSymbolMetadata, setAnalyzedTickers]);
+
+  function savePreferences(
+    labels: string[],
+    assignments: Record<string, string>,
+    overrides: Record<string, string>,
+  ) {
+    if (!userId || !base) return;
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    saveTimeout.current = setTimeout(() => {
+      fetch(`${base}/api/investments/preferences`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-User-Id": userId },
+        body: JSON.stringify({
+          grouping_labels: labels,
+          grouping_assignments: assignments,
+          sector_overrides: overrides,
+        }),
+      });
+    }, 300);
+  }
+
+  function handleAddGroup() {
+    const name = newGroupName.trim();
+    if (!name || groupingLabels.includes(name)) return;
+    const next = [...groupingLabels, name];
+    setGroupingLabels(next);
+    setNewGroupName("");
+    savePreferences(next, groupingAssignments, sectorOverrides);
+  }
+
+  function handleGroupingChange(posKey: string, group: string) {
+    const next = { ...groupingAssignments, [posKey]: group };
+    setGroupingAssignments(next);
+    savePreferences(groupingLabels, next, sectorOverrides);
+  }
+
+  function handleSectorChange(posKey: string, sector: string) {
+    const next = { ...sectorOverrides, [posKey]: sector };
+    setSectorOverrides(next);
+    savePreferences(groupingLabels, groupingAssignments, next);
+  }
 
   useEffect(() => {
     load();
@@ -152,6 +212,8 @@ export default function InvestmentsPage() {
             positions={positions}
             symbolMetadata={symbolMetadata}
             metadataReady={metadataReady}
+            groupingAssignments={groupingAssignments}
+            sectorOverrides={sectorOverrides}
           />
 
           <div className="flex items-center gap-4">
@@ -185,6 +247,27 @@ export default function InvestmentsPage() {
             >
               {analyzing ? "Analyzing…" : "Analyze"}
             </button>
+
+            <div className="ml-auto flex items-center gap-2">
+              <input
+                type="text"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddGroup()}
+                placeholder="New group…"
+                className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-neutral-500"
+              />
+              <button
+                onClick={handleAddGroup}
+                disabled={
+                  !newGroupName.trim() ||
+                  groupingLabels.includes(newGroupName.trim())
+                }
+                className="rounded-md bg-neutral-700 px-3 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Add group
+              </button>
+            </div>
           </div>
 
           {view === "positions" && (
@@ -200,13 +283,25 @@ export default function InvestmentsPage() {
                       analysisStatus={analysisStatus}
                       analyzedTickers={analyzedTickers}
                       symbolMetadata={symbolMetadata}
+                      groupingLabels={groupingLabels}
+                      groupingAssignments={groupingAssignments}
+                      sectorOverrides={sectorOverrides}
+                      onGroupingChange={handleGroupingChange}
+                      onSectorChange={handleSectorChange}
                     />
                   </section>
                   <section className="flex flex-col gap-4">
                     <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
                       Crypto
                     </h2>
-                    <PositionsTable positions={cryptoPositions} />
+                    <PositionsTable
+                      positions={cryptoPositions}
+                      groupingLabels={groupingLabels}
+                      groupingAssignments={groupingAssignments}
+                      sectorOverrides={sectorOverrides}
+                      onGroupingChange={handleGroupingChange}
+                      onSectorChange={handleSectorChange}
+                    />
                   </section>
                 </>
               ) : (
@@ -215,6 +310,11 @@ export default function InvestmentsPage() {
                   analysisStatus={analysisStatus}
                   analyzedTickers={analyzedTickers}
                   symbolMetadata={symbolMetadata}
+                  groupingLabels={groupingLabels}
+                  groupingAssignments={groupingAssignments}
+                  sectorOverrides={sectorOverrides}
+                  onGroupingChange={handleGroupingChange}
+                  onSectorChange={handleSectorChange}
                 />
               )}
             </div>

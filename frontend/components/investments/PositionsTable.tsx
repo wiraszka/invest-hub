@@ -59,6 +59,11 @@ interface Props {
   analysisStatus?: Record<string, AnalysisStatus>;
   analyzedTickers?: Set<string>;
   symbolMetadata?: Record<string, SymbolMetadata>;
+  groupingLabels?: string[];
+  groupingAssignments?: Record<string, string>;
+  sectorOverrides?: Record<string, string>;
+  onGroupingChange?: (key: string, group: string) => void;
+  onSectorChange?: (key: string, sector: string) => void;
 }
 
 function fmt(n: number, decimals = 2): string {
@@ -83,11 +88,14 @@ function StatusCell({ status }: { status: AnalysisStatus }) {
   return null;
 }
 
-function sectorLabel(meta: SymbolMetadata | undefined): string {
+function effectiveSector(
+  meta: SymbolMetadata | undefined,
+  override: string | undefined,
+): string {
+  if (override !== undefined) return override;
   if (!meta) return "";
   if (meta.asset_type === "ETF") return "ETF";
-  if (meta.sector) return meta.sector;
-  return "—";
+  return meta.sector ?? "";
 }
 
 export default function PositionsTable({
@@ -95,6 +103,11 @@ export default function PositionsTable({
   analysisStatus = {},
   analyzedTickers = new Set(),
   symbolMetadata = {},
+  groupingLabels = [],
+  groupingAssignments = {},
+  sectorOverrides = {},
+  onGroupingChange,
+  onSectorChange,
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -163,7 +176,8 @@ export default function PositionsTable({
                 </button>
               </th>
             ))}
-            <th className="w-28 px-4 py-3 text-neutral-500">Sector</th>
+            <th className="w-32 px-4 py-3 text-neutral-500">Sector</th>
+            <th className="w-32 px-4 py-3 text-neutral-500">Grouping</th>
             {COLS_RIGHT.map(({ key, label, numeric, className }) => (
               <th
                 key={key}
@@ -185,13 +199,10 @@ export default function PositionsTable({
         </thead>
         <tbody>
           {sorted.map((p, i) => {
-            const isLink = analyzedTickers.has(
-              canonicalTicker(p.symbol, p.currency),
-            );
-            const status =
-              analysisStatus[canonicalTicker(p.symbol, p.currency)] ?? "idle";
-
             const cticker = canonicalTicker(p.symbol, p.currency);
+            const posKey = `${p.account}::${p.symbol}`;
+            const isLink = analyzedTickers.has(cticker);
+            const status = analysisStatus[cticker] ?? "idle";
 
             return (
               <tr
@@ -217,10 +228,33 @@ export default function PositionsTable({
                 <td className="w-24 px-4 py-3 text-neutral-500">
                   {p.asset_type}
                 </td>
-                <td className="w-28 px-4 py-3 text-neutral-500">
-                  {sectorLabel(
-                    symbolMetadata[canonicalTicker(p.symbol, p.currency)],
-                  )}
+                <td className="w-32 px-4 py-2">
+                  <input
+                    type="text"
+                    value={effectiveSector(
+                      symbolMetadata[cticker],
+                      sectorOverrides[posKey],
+                    )}
+                    onChange={(e) => onSectorChange?.(posKey, e.target.value)}
+                    placeholder="—"
+                    className="w-full bg-transparent text-sm text-neutral-500 outline-none placeholder:text-neutral-700 focus:text-neutral-200"
+                  />
+                </td>
+                <td className="w-32 px-4 py-2">
+                  <select
+                    value={groupingAssignments[posKey] ?? ""}
+                    onChange={(e) => onGroupingChange?.(posKey, e.target.value)}
+                    className="w-full cursor-pointer bg-transparent text-sm text-neutral-500 outline-none"
+                  >
+                    <option value="" className="bg-neutral-900">
+                      —
+                    </option>
+                    {groupingLabels.map((g) => (
+                      <option key={g} value={g} className="bg-neutral-900">
+                        {g}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td className="px-4 py-3 text-right text-neutral-200">
                   {fmt(p.shares_held, p.shares_held % 1 === 0 ? 0 : 4)}
