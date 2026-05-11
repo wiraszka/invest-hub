@@ -1,4 +1,13 @@
-from fastapi import APIRouter, File, Header, HTTPException, Path, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    Body,
+    File,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    UploadFile,
+)
 
 from services.db import (
     get_analysis,
@@ -6,10 +15,12 @@ from services.db import (
     get_symbol_metadata,
     get_symbol_metadata_batch,
     get_transactions,
+    get_user_preferences,
     invalidate_positions_cache,
     replace_transactions,
     set_positions_cache,
     upsert_symbol_metadata,
+    upsert_user_preferences,
 )
 from services.fmp import get_symbol_metadata as fetch_from_fmp
 from services.investments import build_positions, parse_csv
@@ -49,6 +60,26 @@ def get_positions(
     positions = build_positions(transactions)
     set_positions_cache(user_id, positions)
     return positions
+
+
+@router.get("/api/investments/preferences")
+def get_preferences(
+    x_user_id: str | None = Header(default=None),
+) -> dict:
+    user_id = _require_user(x_user_id)
+    return get_user_preferences(user_id)
+
+
+@router.put("/api/investments/preferences")
+def put_preferences(
+    x_user_id: str | None = Header(default=None),
+    body: dict = Body(...),
+) -> dict:
+    user_id = _require_user(x_user_id)
+    allowed = {"grouping_labels", "grouping_assignments", "sector_overrides"}
+    prefs = {k: v for k, v in body.items() if k in allowed}
+    upsert_user_preferences(user_id, prefs)
+    return prefs
 
 
 @router.get("/api/investments/transactions")
