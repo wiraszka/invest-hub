@@ -146,7 +146,10 @@ def test_build_positions_avg_cost_per_share():
 
 
 def test_upload_returns_transaction_count():
-    with patch("routers.investments.replace_transactions") as mock_replace:
+    with (
+        patch("routers.investments.replace_transactions") as mock_replace,
+        patch("routers.investments.invalidate_positions_cache"),
+    ):
         response = client.post(
             "/api/investments/upload",
             files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
@@ -196,7 +199,11 @@ def test_get_positions_returns_list():
         }
     ]
 
-    with patch("routers.investments.get_transactions", return_value=mock_txns):
+    with (
+        patch("routers.investments.get_positions_cache", return_value=None),
+        patch("routers.investments.get_transactions", return_value=mock_txns),
+        patch("routers.investments.set_positions_cache"),
+    ):
         response = client.get(
             "/api/investments/positions",
             headers={"X-User-Id": "user_test123"},
