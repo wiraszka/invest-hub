@@ -9,6 +9,7 @@ import {
 import ChartsSection from "@/components/investments/ChartsSection";
 import ColumnsPopover from "@/components/investments/ColumnsPopover";
 import CsvDropzone from "@/components/investments/CsvDropzone";
+import GroupsPopover from "@/components/investments/GroupsPopover";
 import PositionsTable, {
   ALL_COLUMN_DEFS,
   DEFAULT_VISIBLE_COLUMNS,
@@ -221,7 +222,6 @@ export default function InvestmentsPage() {
       }),
     );
   }
-
 
   function handleGroupingChange(posKey: string, group: string) {
     const next = { ...groupingAssignments, [posKey]: group };
