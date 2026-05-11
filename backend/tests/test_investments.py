@@ -30,6 +30,19 @@ transaction_date,settlement_date,account_id,account_type,activity_type,activity_
 2025-09-16,,HQ8GXMMK0CAD,TFSA,CorporateAction,CONSOLIDATION,LONG,ELE,Elemental Corp,,30,,,
 """
 
+OPTION_CSV = """\
+transaction_date,settlement_date,account_id,account_type,activity_type,activity_sub_type,direction,symbol,name,currency,quantity,unit_price,commission,net_cash_amount
+2026-01-10,2026-01-10,HQ8GXMMK0CAD,TFSA,Trade,BUY,LONG,QQQ   260930P00460000,,USD,1,2.50,0,-250.00
+"""
+
+HOLDINGS_CSV = """\
+Account Name,Account Type,Account Classification,Account Number,Symbol,Exchange,MIC,Name,Security Type,Quantity,Position Direction,Market Price,Market Price Currency,Book Value (CAD),Book Value Currency (CAD),Book Value (Market),Book Value Currency (Market),Market Value,Market Value Currency,Market Unrealized Returns,Market Unrealized Returns Currency
+"TFSA","TFSA","Trade","HQ8GXMMK0CAD","VFV","TSX","XTSE","Vanguard S&P 500 Index ETF","EXCHANGE_TRADED_FUND","7","LONG","105.00","CAD","700.00","CAD","700.00","CAD","735.00","CAD","35.00","CAD"
+"TFSA","TFSA","Trade","HQ8GXMMK0CAD","QQQ   260930P00460000","NASDAQ","XNAS","","OPTION","1","LONG","2.25","USD","490.97","CAD","352.00","USD","225.00","USD","-127.00","USD"
+
+"As of 2026-05-11 10:11 GMT-04:00"
+"""
+
 
 # ---------------------------------------------------------------------------
 # parse_csv
@@ -71,6 +84,14 @@ def test_parse_csv_includes_dividend():
     result = parse_csv(MINIMAL_CSV)
 
     assert any(r["activity_type"] == "Dividend" for r in result)
+
+
+def test_parse_csv_cleans_option_symbol():
+    result = parse_csv(OPTION_CSV)
+
+    trade = next(r for r in result if r["activity_type"] == "Trade")
+    assert trade["symbol"] == "QQQ"
+    assert trade["raw_symbol"] == "QQQ   260930P00460000"
 
 
 # ---------------------------------------------------------------------------
@@ -140,12 +161,25 @@ def test_build_positions_avg_cost_per_share():
     assert abs(vfv["avg_cost_per_share"] - expected_avg) < 0.0001
 
 
+def test_build_positions_cleans_option_symbol():
+    txns = parse_csv(OPTION_CSV)
+
+    positions = build_positions(txns)
+
+    opt = next(p for p in positions if p["is_option"])
+    assert opt["symbol"] == "QQQ"
+    assert opt["raw_symbol"] == "QQQ   260930P00460000"
+    assert opt["asset_type"] == "Option"
+    assert "Put" in opt["option_details"]
+    assert "$460" in opt["option_details"]
+
+
 # ---------------------------------------------------------------------------
 # Router endpoints
 # ---------------------------------------------------------------------------
 
 
-def test_upload_returns_transaction_count():
+def test_upload_activities_returns_count_and_type():
     with (
         patch("routers.investments.replace_transactions") as mock_replace,
         patch("routers.investments.invalidate_positions_cache"),
@@ -157,8 +191,25 @@ def test_upload_returns_transaction_count():
         )
 
     assert response.status_code == 200
-    assert response.json()["count"] > 0
+    data = response.json()
+    assert data["type"] == "activities"
+    assert data["count"] > 0
     mock_replace.assert_called_once()
+
+
+def test_upload_holdings_returns_count_and_type():
+    with patch("routers.investments.set_holdings_cache") as mock_set:
+        response = client.post(
+            "/api/investments/upload",
+            files={"file": ("holdings.csv", HOLDINGS_CSV.encode(), "text/csv")},
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == "holdings"
+    assert data["count"] > 0
+    mock_set.assert_called_once()
 
 
 def test_upload_requires_user_id():
@@ -182,6 +233,36 @@ def test_get_transactions_requires_user_id():
     assert response.status_code == 401
 
 
+def test_get_holdings_requires_user_id():
+    response = client.get("/api/investments/holdings")
+
+    assert response.status_code == 401
+
+
+def test_get_holdings_returns_list():
+    mock_holdings = [{"account": "TFSA", "symbol": "VFV", "market_value_cad": 735.0}]
+
+    with patch("routers.investments.get_holdings_cache", return_value=mock_holdings):
+        response = client.get(
+            "/api/investments/holdings",
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()[0]["symbol"] == "VFV"
+
+
+def test_get_holdings_returns_empty_list_when_none():
+    with patch("routers.investments.get_holdings_cache", return_value=None):
+        response = client.get(
+            "/api/investments/holdings",
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_get_positions_returns_list():
     mock_txns = [
         {
@@ -190,6 +271,7 @@ def test_get_positions_returns_list():
             "activity_type": "Trade",
             "activity_sub_type": "BUY",
             "symbol": "VFV",
+            "raw_symbol": "VFV",
             "name": "Vanguard S&P 500 Index ETF",
             "currency": "CAD",
             "quantity": 10.0,

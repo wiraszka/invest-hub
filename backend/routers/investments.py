@@ -11,6 +11,7 @@ from fastapi import (
 
 from services.db import (
     get_analysis,
+    get_holdings_cache,
     get_positions_cache,
     get_symbol_metadata,
     get_symbol_metadata_batch,
@@ -18,11 +19,13 @@ from services.db import (
     get_user_preferences,
     invalidate_positions_cache,
     replace_transactions,
+    set_holdings_cache,
     set_positions_cache,
     upsert_symbol_metadata,
     upsert_user_preferences,
 )
 from services.fmp import get_symbol_metadata as fetch_from_fmp
+from services.holdings import parse_holdings_csv
 from services.investments import build_positions, parse_csv
 from services.sec import get_sic_metadata as fetch_from_sec
 
@@ -35,17 +38,33 @@ def _require_user(x_user_id: str | None) -> str:
     return x_user_id
 
 
+def _detect_format(content: str) -> str:
+    """Detect CSV format by inspecting the header row."""
+    first_line = content.split("\n")[0]
+    if "Market Price" in first_line or "Book Value (CAD)" in first_line:
+        return "holdings"
+    return "activities"
+
+
 @router.post("/api/investments/upload")
-async def upload_transactions(
+async def upload_csv(
     file: UploadFile = File(...),
     x_user_id: str | None = Header(default=None),
 ) -> dict:
     user_id = _require_user(x_user_id)
     content = (await file.read()).decode("utf-8")
+
+    fmt = _detect_format(content)
+
+    if fmt == "holdings":
+        data = parse_holdings_csv(content)
+        set_holdings_cache(user_id, data)
+        return {"type": "holdings", "count": len(data)}
+
     transactions = parse_csv(content)
     replace_transactions(user_id, transactions)
     invalidate_positions_cache(user_id)
-    return {"count": len(transactions)}
+    return {"type": "activities", "count": len(transactions)}
 
 
 @router.get("/api/investments/positions")
@@ -62,6 +81,15 @@ def get_positions(
     return positions
 
 
+@router.get("/api/investments/holdings")
+def get_holdings(
+    x_user_id: str | None = Header(default=None),
+) -> list[dict]:
+    user_id = _require_user(x_user_id)
+    cached = get_holdings_cache(user_id)
+    return cached if cached is not None else []
+
+
 @router.get("/api/investments/preferences")
 def get_preferences(
     x_user_id: str | None = Header(default=None),
@@ -76,7 +104,15 @@ def put_preferences(
     body: dict = Body(...),
 ) -> dict:
     user_id = _require_user(x_user_id)
-    allowed = {"grouping_labels", "grouping_assignments", "sector_overrides"}
+    allowed = {
+        "grouping_labels",
+        "grouping_assignments",
+        "sector_overrides",
+        "industry_overrides",
+        "visible_columns",
+        "middle_chart_column",
+        "chart_value_mode",
+    }
     prefs = {k: v for k, v in body.items() if k in allowed}
     upsert_user_preferences(user_id, prefs)
     return prefs
