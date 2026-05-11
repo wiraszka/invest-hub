@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.13.0] - 2026-05-11
+
+### Added
+
+- Add Grouping column to the Positions table — users create named groups via a text input in the toolbar and assign each position to a group via a dropdown; assignments are persisted to MongoDB per user
+- Replace the Geography donut chart with a Groupings donut chart that updates live as groupings are assigned
+- Make the Sector column in the Positions table editable — users can manually enter or override sector names, which are persisted to MongoDB and immediately reflected in the Sector donut chart
+
 ## [v1.12.0] - 2026-05-10
 
 ### Added
@@ -236,6 +244,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.13.0]: https://github.com/wiraszka/invest-hub/compare/v1.12.0...v1.13.0
 [v1.12.0]: https://github.com/wiraszka/invest-hub/compare/v1.11.0...v1.12.0
 [v1.11.0]: https://github.com/wiraszka/invest-hub/compare/v1.10.0...v1.11.0
 [v1.10.0]: https://github.com/wiraszka/invest-hub/compare/v1.9.0...v1.10.0
