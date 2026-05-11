@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
+
 import requests
 
 SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
-SEC_HEADERS = {"User-Agent": "invest-hub adam.wirasz@gmail.com"}
+SEC_HEADERS = {"User-Agent": f"invest-hub {os.environ.get('SEC_CONTACT_EMAIL', '')}"}
 
 _cache: dict | None = None
 
@@ -26,7 +28,7 @@ def search_companies(query: str, limit: int = 10) -> list[dict]:
     if not query or len(query.strip()) < 1:
         return []
 
-    q = query.strip().upper()
+    normalized_query = query.strip().upper()
     tickers = _load_tickers()
 
     ticker_matches: list[dict] = []
@@ -37,11 +39,11 @@ def search_companies(query: str, limit: int = 10) -> list[dict]:
         name = entry.get("title", "")
         cik = str(entry.get("cik_str", "")).zfill(10)
 
-        if ticker.upper() == q:
+        if ticker.upper() == normalized_query:
             ticker_matches.append({"ticker": ticker, "name": name, "cik": cik})
-        elif ticker.upper().startswith(q):
+        elif ticker.upper().startswith(normalized_query):
             ticker_matches.append({"ticker": ticker, "name": name, "cik": cik})
-        elif q in name.upper():
+        elif normalized_query in name.upper():
             name_matches.append({"ticker": ticker, "name": name, "cik": cik})
 
     results = ticker_matches + name_matches

@@ -67,6 +67,7 @@ npm run dev
 | `MONGODB_URI` | MongoDB Atlas connection string |
 | `TD_API_KEY` | TwelveData API key |
 | `FMP_API_KEY` | Financial Modeling Prep API key |
+| `SEC_CONTACT_EMAIL` | Contact email included in SEC EDGAR User-Agent (required by EDGAR API policy) |
 
 ### Frontend (`frontend/.env.local`)
 

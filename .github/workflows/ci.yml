@@ -36,6 +36,7 @@ jobs:
           FMP_API_KEY: test_key
           TD_API_KEY: test_key
           ANTHROPIC_API_KEY: test_key
+          SEC_CONTACT_EMAIL: ci@example.com
 
   frontend:
     name: Frontend — typecheck + lint + test

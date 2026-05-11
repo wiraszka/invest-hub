@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from datetime import date, timedelta
 
@@ -7,7 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 
 HEADERS = {
-    "User-Agent": "invest-hub adam.wirasz@gmail.com",
+    "User-Agent": f"invest-hub {os.environ.get('SEC_CONTACT_EMAIL', '')}",
     "Accept-Encoding": "gzip, deflate",
 }
 TIMEOUT = 30
