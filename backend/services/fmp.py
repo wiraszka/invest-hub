@@ -103,13 +103,13 @@ def get_financials(symbol: str) -> dict | None:
     balance: dict = {}
     balance_raw = _get(f"/balance-sheet-statement/{fmp_ticker}?limit=1")
     if balance_raw and isinstance(balance_raw, list) and len(balance_raw) > 0:
-        b = balance_raw[0]
+        latest_balance = balance_raw[0]
         balance = {
-            "cash": b.get("cashAndCashEquivalents"),
-            "total_debt": b.get("totalDebt"),
-            "net_debt": b.get("netDebt"),
-            "total_equity": b.get("totalStockholdersEquity"),
-            "total_assets": b.get("totalAssets"),
+            "cash": latest_balance.get("cashAndCashEquivalents"),
+            "total_debt": latest_balance.get("totalDebt"),
+            "net_debt": latest_balance.get("netDebt"),
+            "total_equity": latest_balance.get("totalStockholdersEquity"),
+            "total_assets": latest_balance.get("totalAssets"),
         }
 
     cash_flow: list = []
@@ -127,14 +127,14 @@ def get_financials(symbol: str) -> dict | None:
     metrics: dict = {}
     metrics_raw = _get(f"/key-metrics/{fmp_ticker}?limit=1")
     if metrics_raw and isinstance(metrics_raw, list) and len(metrics_raw) > 0:
-        m = metrics_raw[0]
+        latest_metrics = metrics_raw[0]
         metrics = {
-            "market_cap": m.get("marketCap"),
-            "enterprise_value": m.get("enterpriseValue"),
-            "pe_ratio": m.get("peRatio"),
-            "ev_ebitda": m.get("evToEbitda"),
-            "price_to_book": m.get("pbRatio"),
-            "roe": m.get("roe"),
+            "market_cap": latest_metrics.get("marketCap"),
+            "enterprise_value": latest_metrics.get("enterpriseValue"),
+            "pe_ratio": latest_metrics.get("peRatio"),
+            "ev_ebitda": latest_metrics.get("evToEbitda"),
+            "price_to_book": latest_metrics.get("pbRatio"),
+            "roe": latest_metrics.get("roe"),
         }
 
     return {

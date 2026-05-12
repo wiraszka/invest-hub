@@ -5,9 +5,16 @@ import { useRef, useState } from "react";
 interface Props {
   userId: string;
   onUpload: () => void;
+  label?: string;
+  uploaded?: boolean;
 }
 
-export default function CsvDropzone({ userId, onUpload }: Props) {
+export default function CsvDropzone({
+  userId,
+  onUpload,
+  label = "↑ Re-upload CSV",
+  uploaded = false,
+}: Props) {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +63,15 @@ export default function CsvDropzone({ userId, onUpload }: Props) {
     e.target.value = "";
   }
 
+  const baseClass =
+    "flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm transition-colors";
+
+  const stateClass = dragging
+    ? "border border-dashed border-blue-400 bg-blue-400/5 text-blue-400"
+    : uploaded
+      ? "border border-neutral-600 text-emerald-400 hover:border-neutral-500"
+      : "border border-dashed border-neutral-700 text-neutral-500 hover:border-neutral-500 hover:text-neutral-400";
+
   return (
     <div>
       <div
@@ -66,11 +82,7 @@ export default function CsvDropzone({ userId, onUpload }: Props) {
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`flex cursor-pointer items-center gap-2 rounded-lg border border-dashed px-4 py-2 text-sm transition-colors ${
-          dragging
-            ? "border-blue-400 bg-blue-400/5 text-blue-400"
-            : "border-neutral-700 text-neutral-500 hover:border-neutral-500 hover:text-neutral-400"
-        }`}
+        className={`${baseClass} ${stateClass}`}
       >
         <input
           ref={inputRef}
@@ -80,7 +92,7 @@ export default function CsvDropzone({ userId, onUpload }: Props) {
           className="hidden"
           data-testid="csv-file-input"
         />
-        {loading ? <span>Uploading…</span> : <span>↑ Re-upload CSV</span>}
+        {loading ? <span>Uploading…</span> : <span>{label}</span>}
       </div>
       {error && (
         <p className="mt-2 text-center text-sm text-red-400">{error}</p>

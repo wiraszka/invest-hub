@@ -3,11 +3,8 @@ from __future__ import annotations
 import os
 
 import requests
-from dotenv import load_dotenv
 
 from services.fmp import get_quote_price
-
-load_dotenv()
 
 TD_BASE = "https://api.twelvedata.com"
 

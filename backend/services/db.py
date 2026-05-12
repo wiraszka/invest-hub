@@ -34,6 +34,10 @@ def _positions_collection() -> Collection:
     return _db()["positions_cache"]
 
 
+def _holdings_collection() -> Collection:
+    return _db()["holdings_cache"]
+
+
 # ---------------------------------------------------------------------------
 # Analyses
 # ---------------------------------------------------------------------------
@@ -121,8 +125,35 @@ def invalidate_positions_cache(user_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# User preferences (groupings + sector overrides)
+# Holdings cache
 # ---------------------------------------------------------------------------
+
+
+def get_holdings_cache(user_id: str) -> list[dict] | None:
+    doc = _holdings_collection().find_one({"user_id": user_id}, {"_id": 0})
+    return doc.get("holdings") if doc else None
+
+
+def set_holdings_cache(user_id: str, holdings: list[dict]) -> None:
+    _holdings_collection().replace_one(
+        {"user_id": user_id},
+        {"user_id": user_id, "holdings": holdings},
+        upsert=True,
+    )
+
+
+def invalidate_holdings_cache(user_id: str) -> None:
+    _holdings_collection().delete_one({"user_id": user_id})
+
+
+# ---------------------------------------------------------------------------
+# User preferences
+# ---------------------------------------------------------------------------
+
+
+def _preferences_collection() -> Collection:
+    return _db()["user_preferences"]
+
 
 _DEFAULT_PREFERENCES: dict = {
     "grouping_labels": [],
@@ -144,10 +175,6 @@ def upsert_user_preferences(user_id: str, prefs: dict) -> None:
         {"user_id": user_id, **prefs},
         upsert=True,
     )
-
-
-def _preferences_collection() -> Collection:
-    return _db()["user_preferences"]
 
 
 def _symbol_metadata_collection() -> Collection:
@@ -177,21 +204,12 @@ def get_transactions(user_id: str) -> list[dict]:
     )
 
 
-def has_transactions(user_id: str) -> bool:
-    return _transactions_collection().count_documents({"user_id": user_id}, limit=1) > 0
-
-
-# ---------------------------------------------------------------------------
-# Analyses
-# ---------------------------------------------------------------------------
-
-
-_METADATA_TTL_DAYS = 30
-
 
 # ---------------------------------------------------------------------------
 # Symbol metadata
 # ---------------------------------------------------------------------------
+
+_METADATA_TTL_DAYS = 30
 
 
 def get_symbol_metadata(ticker: str) -> dict | None:

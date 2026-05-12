@@ -9,6 +9,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://localhost:3001",
         "https://invest-hub-frontend-six.vercel.app",
         "https://investhub.tech",
         "https://www.investhub.tech",

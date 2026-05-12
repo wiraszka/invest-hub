@@ -7,8 +7,12 @@ import {
   type SymbolMetadata,
 } from "@/components/investments/ChartsSection";
 import ChartsSection from "@/components/investments/ChartsSection";
+import ColumnsPopover from "@/components/investments/ColumnsPopover";
 import CsvDropzone from "@/components/investments/CsvDropzone";
+import GroupsPopover from "@/components/investments/GroupsPopover";
 import PositionsTable, {
+  ALL_COLUMN_DEFS,
+  DEFAULT_VISIBLE_COLUMNS,
   type Position,
 } from "@/components/investments/PositionsTable";
 import TransactionsTable, {
@@ -17,6 +21,20 @@ import TransactionsTable, {
 import { useAnalyze } from "@/contexts/AnalyzeContext";
 
 type View = "positions" | "transactions";
+type ChartValueMode = "cost_basis" | "market_value";
+
+interface HoldingRecord {
+  account: string;
+  raw_symbol: string;
+  symbol: string;
+  exchange?: string;
+  market_price?: number;
+  market_price_currency?: string;
+  market_value_cad?: number;
+  unrealized_pl_cad?: number;
+  is_option?: boolean;
+  option_details?: string;
+}
 
 export default function InvestmentsPage() {
   const { userId } = useAuth();
@@ -32,6 +50,7 @@ export default function InvestmentsPage() {
 
   const [positions, setPositions] = useState<Position[] | null>(null);
   const [transactions, setTransactions] = useState<Transaction[] | null>(null);
+  const [holdings, setHoldings] = useState<HoldingRecord[]>([]);
   const [view, setView] = useState<View>("positions");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +63,17 @@ export default function InvestmentsPage() {
   const [sectorOverrides, setSectorOverrides] = useState<
     Record<string, string>
   >({});
-  const [newGroupName, setNewGroupName] = useState("");
+  const [industryOverrides, setIndustryOverrides] = useState<
+    Record<string, string>
+  >({});
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    DEFAULT_VISIBLE_COLUMNS,
+  );
+  const [middleChartColumn, setMiddleChartColumn] = useState<
+    "sector" | "industry"
+  >("sector");
+  const [chartValueMode, setChartValueMode] =
+    useState<ChartValueMode>("cost_basis");
 
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -59,10 +88,11 @@ export default function InvestmentsPage() {
     try {
       const headers = { "X-User-Id": userId };
 
-      const [posRes, txnRes, prefRes] = await Promise.all([
+      const [posRes, txnRes, prefRes, holdingsRes] = await Promise.all([
         fetch(`${base}/api/investments/positions`, { headers }),
         fetch(`${base}/api/investments/transactions`, { headers }),
         fetch(`${base}/api/investments/preferences`, { headers }),
+        fetch(`${base}/api/investments/holdings`, { headers }),
       ]);
 
       if (!posRes.ok || !txnRes.ok) {
@@ -81,6 +111,21 @@ export default function InvestmentsPage() {
         setGroupingLabels(prefs.grouping_labels ?? []);
         setGroupingAssignments(prefs.grouping_assignments ?? {});
         setSectorOverrides(prefs.sector_overrides ?? {});
+        setIndustryOverrides(prefs.industry_overrides ?? {});
+        if (prefs.visible_columns?.length) {
+          setVisibleColumns(prefs.visible_columns);
+        }
+        if (prefs.middle_chart_column) {
+          setMiddleChartColumn(prefs.middle_chart_column);
+        }
+        if (prefs.chart_value_mode) {
+          setChartValueMode(prefs.chart_value_mode);
+        }
+      }
+
+      if (holdingsRes.ok) {
+        const holdingsData: HoldingRecord[] = await holdingsRes.json();
+        setHoldings(holdingsData);
       }
 
       const nonCryptoTickers = [
@@ -114,11 +159,15 @@ export default function InvestmentsPage() {
     }
   }, [userId, base, setSymbolMetadata, setAnalyzedTickers]);
 
-  function savePreferences(
-    labels: string[],
-    assignments: Record<string, string>,
-    overrides: Record<string, string>,
-  ) {
+  function savePreferences(prefs: {
+    groupingLabels: string[];
+    groupingAssignments: Record<string, string>;
+    sectorOverrides: Record<string, string>;
+    industryOverrides: Record<string, string>;
+    visibleColumns: string[];
+    middleChartColumn: string;
+    chartValueMode: string;
+  }) {
     if (!userId || !base) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
@@ -126,33 +175,85 @@ export default function InvestmentsPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json", "X-User-Id": userId },
         body: JSON.stringify({
-          grouping_labels: labels,
-          grouping_assignments: assignments,
-          sector_overrides: overrides,
+          grouping_labels: prefs.groupingLabels,
+          grouping_assignments: prefs.groupingAssignments,
+          sector_overrides: prefs.sectorOverrides,
+          industry_overrides: prefs.industryOverrides,
+          visible_columns: prefs.visibleColumns,
+          middle_chart_column: prefs.middleChartColumn,
+          chart_value_mode: prefs.chartValueMode,
         }),
       });
     }, 300);
   }
 
-  function handleAddGroup() {
-    const name = newGroupName.trim();
-    if (!name || groupingLabels.includes(name)) return;
+  function currentPrefs(
+    overrides?: Partial<Parameters<typeof savePreferences>[0]>,
+  ) {
+    return {
+      groupingLabels,
+      groupingAssignments,
+      sectorOverrides,
+      industryOverrides,
+      visibleColumns,
+      middleChartColumn,
+      chartValueMode,
+      ...overrides,
+    };
+  }
+
+  function handleAddGroup(name: string) {
     const next = [...groupingLabels, name];
     setGroupingLabels(next);
-    setNewGroupName("");
-    savePreferences(next, groupingAssignments, sectorOverrides);
+    savePreferences(currentPrefs({ groupingLabels: next }));
+  }
+
+  function handleRemoveGroup(name: string) {
+    const nextLabels = groupingLabels.filter((g) => g !== name);
+    const nextAssignments = Object.fromEntries(
+      Object.entries(groupingAssignments).filter(([, v]) => v !== name),
+    );
+    setGroupingLabels(nextLabels);
+    setGroupingAssignments(nextAssignments);
+    savePreferences(
+      currentPrefs({
+        groupingLabels: nextLabels,
+        groupingAssignments: nextAssignments,
+      }),
+    );
   }
 
   function handleGroupingChange(posKey: string, group: string) {
     const next = { ...groupingAssignments, [posKey]: group };
     setGroupingAssignments(next);
-    savePreferences(groupingLabels, next, sectorOverrides);
+    savePreferences(currentPrefs({ groupingAssignments: next }));
   }
 
   function handleSectorChange(posKey: string, sector: string) {
     const next = { ...sectorOverrides, [posKey]: sector };
     setSectorOverrides(next);
-    savePreferences(groupingLabels, groupingAssignments, next);
+    savePreferences(currentPrefs({ sectorOverrides: next }));
+  }
+
+  function handleIndustryChange(posKey: string, industry: string) {
+    const next = { ...industryOverrides, [posKey]: industry };
+    setIndustryOverrides(next);
+    savePreferences(currentPrefs({ industryOverrides: next }));
+  }
+
+  function handleVisibleColumnsChange(cols: string[]) {
+    setVisibleColumns(cols);
+    savePreferences(currentPrefs({ visibleColumns: cols }));
+  }
+
+  function handleMiddleChartColumnChange(col: "sector" | "industry") {
+    setMiddleChartColumn(col);
+    savePreferences(currentPrefs({ middleChartColumn: col }));
+  }
+
+  function handleChartValueModeChange(mode: ChartValueMode) {
+    setChartValueMode(mode);
+    savePreferences(currentPrefs({ chartValueMode: mode }));
   }
 
   useEffect(() => {
@@ -171,12 +272,44 @@ export default function InvestmentsPage() {
     startAnalyze(tickers, base);
   }
 
-  const equityPositions =
-    positions?.filter((p) => p.account !== "Crypto") ?? [];
-  const cryptoPositions =
-    positions?.filter((p) => p.account === "Crypto") ?? [];
+  // Merge holdings market data into positions by account + raw_symbol (falling back to symbol)
+  const holdingsMap = new Map<string, HoldingRecord>();
+  for (const h of holdings) {
+    holdingsMap.set(`${h.account}::${h.raw_symbol}`, h);
+  }
+
+  function enrichPosition(p: Position): Position {
+    const h =
+      holdingsMap.get(`${p.account}::${p.raw_symbol}`) ??
+      holdingsMap.get(`${p.account}::${p.symbol}`);
+    if (!h) return p;
+    return {
+      ...p,
+      exchange: h.exchange,
+      market_price: h.market_price,
+      market_price_currency: h.market_price_currency,
+      market_value_cad: h.market_value_cad ?? undefined,
+      unrealized_pl_cad: h.unrealized_pl_cad ?? undefined,
+    };
+  }
+
+  const hasHoldings = holdings.length > 0;
+  const allPositions = positions?.map(enrichPosition) ?? [];
+  const equityPositions = allPositions.filter((p) => p.account !== "Crypto");
+  const cryptoPositions = allPositions.filter((p) => p.account === "Crypto");
   const hasCrypto = cryptoPositions.length > 0;
   const metadataReady = Object.keys(symbolMetadata).length > 0;
+
+  const tableProps = {
+    groupingLabels,
+    groupingAssignments,
+    sectorOverrides,
+    industryOverrides,
+    visibleColumns,
+    onGroupingChange: handleGroupingChange,
+    onSectorChange: handleSectorChange,
+    onIndustryChange: handleIndustryChange,
+  };
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl mx-auto">
@@ -189,7 +322,22 @@ export default function InvestmentsPage() {
             Upload your Wealthsimple activities export to track your portfolio
           </p>
         </div>
-        {hasData && userId && <CsvDropzone userId={userId} onUpload={load} />}
+        {hasData && userId && (
+          <div className="flex items-center gap-2">
+            <CsvDropzone
+              userId={userId}
+              onUpload={load}
+              label="↑ Activities"
+              uploaded={true}
+            />
+            <CsvDropzone
+              userId={userId}
+              onUpload={load}
+              label={hasHoldings ? "Holdings ✓" : "↑ Holdings"}
+              uploaded={hasHoldings}
+            />
+          </div>
+        )}
       </div>
 
       {loading && (
@@ -208,12 +356,43 @@ export default function InvestmentsPage() {
 
       {!loading && hasData && positions !== null && transactions !== null && (
         <>
+          {hasHoldings && (
+            <div className="flex justify-center">
+              <div className="inline-flex overflow-hidden rounded-md border border-neutral-700 text-xs">
+                <button
+                  onClick={() => handleChartValueModeChange("cost_basis")}
+                  className={`px-3 py-1.5 transition-colors ${
+                    chartValueMode === "cost_basis"
+                      ? "bg-neutral-700 text-white"
+                      : "text-neutral-400 hover:text-neutral-300"
+                  }`}
+                >
+                  Cost Basis
+                </button>
+                <button
+                  onClick={() => handleChartValueModeChange("market_value")}
+                  className={`px-3 py-1.5 transition-colors ${
+                    chartValueMode === "market_value"
+                      ? "bg-neutral-700 text-white"
+                      : "text-neutral-400 hover:text-neutral-300"
+                  }`}
+                >
+                  Market Value
+                </button>
+              </div>
+            </div>
+          )}
+
           <ChartsSection
-            positions={positions}
+            positions={allPositions}
             symbolMetadata={symbolMetadata}
             metadataReady={metadataReady}
             groupingAssignments={groupingAssignments}
             sectorOverrides={sectorOverrides}
+            industryOverrides={industryOverrides}
+            middleChartColumn={middleChartColumn}
+            onMiddleChartColumnChange={handleMiddleChartColumnChange}
+            chartValueMode={chartValueMode}
           />
 
           <div className="flex items-center gap-4">
@@ -248,25 +427,17 @@ export default function InvestmentsPage() {
               {analyzing ? "Analyzing…" : "Analyze"}
             </button>
 
-            <div className="ml-auto flex items-center gap-2">
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddGroup()}
-                placeholder="New group…"
-                className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-neutral-500"
+            <div className="ml-auto flex gap-2">
+              <GroupsPopover
+                groupingLabels={groupingLabels}
+                onAdd={handleAddGroup}
+                onRemove={handleRemoveGroup}
               />
-              <button
-                onClick={handleAddGroup}
-                disabled={
-                  !newGroupName.trim() ||
-                  groupingLabels.includes(newGroupName.trim())
-                }
-                className="rounded-md bg-neutral-700 px-3 py-2 text-sm font-medium text-neutral-200 transition-colors hover:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Add group
-              </button>
+              <ColumnsPopover
+                columns={ALL_COLUMN_DEFS}
+                visibleColumns={visibleColumns}
+                onChange={handleVisibleColumnsChange}
+              />
             </div>
           </div>
 
@@ -283,11 +454,7 @@ export default function InvestmentsPage() {
                       analysisStatus={analysisStatus}
                       analyzedTickers={analyzedTickers}
                       symbolMetadata={symbolMetadata}
-                      groupingLabels={groupingLabels}
-                      groupingAssignments={groupingAssignments}
-                      sectorOverrides={sectorOverrides}
-                      onGroupingChange={handleGroupingChange}
-                      onSectorChange={handleSectorChange}
+                      {...tableProps}
                     />
                   </section>
                   <section className="flex flex-col gap-4">
@@ -296,11 +463,7 @@ export default function InvestmentsPage() {
                     </h2>
                     <PositionsTable
                       positions={cryptoPositions}
-                      groupingLabels={groupingLabels}
-                      groupingAssignments={groupingAssignments}
-                      sectorOverrides={sectorOverrides}
-                      onGroupingChange={handleGroupingChange}
-                      onSectorChange={handleSectorChange}
+                      {...tableProps}
                     />
                   </section>
                 </>
@@ -310,11 +473,7 @@ export default function InvestmentsPage() {
                   analysisStatus={analysisStatus}
                   analyzedTickers={analyzedTickers}
                   symbolMetadata={symbolMetadata}
-                  groupingLabels={groupingLabels}
-                  groupingAssignments={groupingAssignments}
-                  sectorOverrides={sectorOverrides}
-                  onGroupingChange={handleGroupingChange}
-                  onSectorChange={handleSectorChange}
+                  {...tableProps}
                 />
               )}
             </div>
