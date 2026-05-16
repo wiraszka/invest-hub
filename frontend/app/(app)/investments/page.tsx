@@ -10,6 +10,7 @@ import ChartsSection from "@/components/investments/ChartsSection";
 import ColumnsPopover from "@/components/investments/ColumnsPopover";
 import CsvDropzone from "@/components/investments/CsvDropzone";
 import GroupsPopover from "@/components/investments/GroupsPopover";
+import UploadManager from "@/components/investments/UploadManager";
 import PositionsTable, {
   ALL_COLUMN_DEFS,
   DEFAULT_VISIBLE_COLUMNS,
@@ -319,23 +320,21 @@ export default function InvestmentsPage() {
             Investments
           </h1>
           <p className="text-sm text-neutral-500">
-            Upload your Wealthsimple activities export to track your portfolio
+            Upload your Wealthsimple activities CSV or Questrade activities XLSX
+            to track your portfolio
           </p>
         </div>
-        {hasData && userId && (
-          <div className="flex items-center gap-2">
-            <CsvDropzone
-              userId={userId}
-              onUpload={load}
-              label="↑ Activities"
-              uploaded={true}
-            />
-            <CsvDropzone
-              userId={userId}
-              onUpload={load}
-              label={hasHoldings ? "Holdings ✓" : "↑ Holdings"}
-              uploaded={hasHoldings}
-            />
+        {userId && (
+          <div className="flex items-start gap-2">
+            <UploadManager userId={userId} onUpload={load} />
+            {hasData && (
+              <CsvDropzone
+                userId={userId}
+                onUpload={load}
+                label={hasHoldings ? "Holdings ✓" : "↑ Holdings"}
+                uploaded={hasHoldings}
+              />
+            )}
           </div>
         )}
       </div>
@@ -348,10 +347,6 @@ export default function InvestmentsPage() {
 
       {error && !loading && (
         <p className="text-center text-sm text-red-400">{error}</p>
-      )}
-
-      {!loading && !hasData && userId && (
-        <CsvDropzone userId={userId} onUpload={load} />
       )}
 
       {!loading && hasData && positions !== null && transactions !== null && (

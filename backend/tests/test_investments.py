@@ -181,7 +181,7 @@ def test_build_positions_cleans_option_symbol():
 
 def test_upload_activities_returns_count_and_type():
     with (
-        patch("routers.investments.replace_transactions") as mock_replace,
+        patch("routers.investments.replace_transactions_for_source") as mock_replace,
         patch("routers.investments.invalidate_positions_cache"),
     ):
         response = client.post(
@@ -195,6 +195,23 @@ def test_upload_activities_returns_count_and_type():
     assert data["type"] == "activities"
     assert data["count"] > 0
     mock_replace.assert_called_once()
+
+
+def test_upload_activities_tags_source_as_wealthsimple():
+    with (
+        patch("routers.investments.replace_transactions_for_source") as mock_replace,
+        patch("routers.investments.invalidate_positions_cache"),
+    ):
+        client.post(
+            "/api/investments/upload",
+            files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    _, call_kwargs = mock_replace.call_args
+    # Third positional arg is source (user_id, source, min_date, max_date, transactions)
+    call_args = mock_replace.call_args[0]
+    assert call_args[1] == "wealthsimple"
 
 
 def test_upload_holdings_returns_count_and_type():
@@ -225,6 +242,62 @@ def test_get_positions_requires_user_id():
     response = client.get("/api/investments/positions")
 
     assert response.status_code == 401
+
+
+def test_get_sources_requires_user_id():
+    response = client.get("/api/investments/sources")
+
+    assert response.status_code == 401
+
+
+def test_get_sources_returns_list():
+    mock_sources = [
+        {"source": "wealthsimple", "count": 45, "min_date": "2024-01-15", "max_date": "2025-03-26"}
+    ]
+
+    with patch("routers.investments.get_transaction_sources", return_value=mock_sources):
+        response = client.get(
+            "/api/investments/sources",
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["source"] == "wealthsimple"
+    assert data[0]["count"] == 45
+
+
+def test_delete_source_requires_user_id():
+    response = client.delete("/api/investments/sources/wealthsimple")
+
+    assert response.status_code == 401
+
+
+def test_delete_source_clears_and_invalidates():
+    with (
+        patch("routers.investments.clear_transactions_for_source") as mock_clear,
+        patch("routers.investments.invalidate_positions_cache"),
+    ):
+        response = client.delete(
+            "/api/investments/sources/wealthsimple",
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    assert response.status_code == 200
+    mock_clear.assert_called_once_with("user_test123", "wealthsimple")
+
+
+def test_delete_legacy_source_passes_none():
+    with (
+        patch("routers.investments.clear_transactions_for_source") as mock_clear,
+        patch("routers.investments.invalidate_positions_cache"),
+    ):
+        client.delete(
+            "/api/investments/sources/legacy",
+            headers={"X-User-Id": "user_test123"},
+        )
+
+    mock_clear.assert_called_once_with("user_test123", None)
 
 
 def test_get_transactions_requires_user_id():
