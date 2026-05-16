@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.15.0] - 2026-05-16
+
+### Added
+
+- Support Questrade activities XLSX upload — auto-detected by file extension alongside the existing Wealthsimple CSV; parses trades, dividends, and corporate actions into the shared transaction schema
+- Add per-source upload manager to the Investments page — shows a card per brokerage (Wealthsimple, Questrade) with transaction count and date range; each card has a re-upload button that replaces only the uploaded date range for that source, allowing multiple brokerages to coexist; a clear button removes a source entirely
+
 ## [v1.14.0] - 2026-05-11
 
 ### Added

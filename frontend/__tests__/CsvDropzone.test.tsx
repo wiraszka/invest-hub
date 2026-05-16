@@ -19,7 +19,7 @@ describe("CsvDropzone", () => {
   it("renders the upload prompt", () => {
     render(<CsvDropzone userId="user_123" onUpload={onUpload} />);
 
-    expect(screen.getByText(/re-upload csv/i)).toBeInTheDocument();
+    expect(screen.getByText(/re-upload/i)).toBeInTheDocument();
   });
 
   it("calls fetch and onUpload when a csv file is selected", async () => {
