@@ -10,15 +10,17 @@ from fastapi import (
 )
 
 from services.db import (
+    clear_transactions_for_source,
     get_analysis,
     get_holdings_cache,
     get_positions_cache,
     get_symbol_metadata,
     get_symbol_metadata_batch,
+    get_transaction_sources,
     get_transactions,
     get_user_preferences,
     invalidate_positions_cache,
-    replace_transactions,
+    replace_transactions_for_source,
     set_holdings_cache,
     set_positions_cache,
     upsert_symbol_metadata,
@@ -26,7 +28,7 @@ from services.db import (
 )
 from services.fmp import get_symbol_metadata as fetch_from_fmp
 from services.holdings import parse_holdings_csv
-from services.investments import build_positions, parse_csv
+from services.investments import build_positions, parse_csv, parse_questrade_xlsx
 from services.sec import get_sic_metadata as fetch_from_sec
 
 router = APIRouter()
@@ -52,17 +54,27 @@ async def upload_csv(
     x_user_id: str | None = Header(default=None),
 ) -> dict:
     user_id = _require_user(x_user_id)
-    content = (await file.read()).decode("utf-8")
+    raw = await file.read()
+    filename = (file.filename or "").lower()
 
-    fmt = _detect_format(content)
+    if filename.endswith(".xlsx"):
+        transactions = parse_questrade_xlsx(raw)
+    else:
+        content = raw.decode("utf-8")
+        fmt = _detect_format(content)
+        if fmt == "holdings":
+            data = parse_holdings_csv(content)
+            set_holdings_cache(user_id, data)
+            return {"type": "holdings", "count": len(data)}
+        transactions = parse_csv(content)
 
-    if fmt == "holdings":
-        data = parse_holdings_csv(content)
-        set_holdings_cache(user_id, data)
-        return {"type": "holdings", "count": len(data)}
+    if not transactions:
+        return {"type": "activities", "count": 0}
 
-    transactions = parse_csv(content)
-    replace_transactions(user_id, transactions)
+    source = transactions[0]["source"]
+    min_date = min(t["transaction_date"] for t in transactions)
+    max_date = max(t["transaction_date"] for t in transactions)
+    replace_transactions_for_source(user_id, source, min_date, max_date, transactions)
     invalidate_positions_cache(user_id)
     return {"type": "activities", "count": len(transactions)}
 
@@ -116,6 +128,26 @@ def put_preferences(
     prefs = {k: v for k, v in body.items() if k in allowed}
     upsert_user_preferences(user_id, prefs)
     return prefs
+
+
+@router.get("/api/investments/sources")
+def list_sources(
+    x_user_id: str | None = Header(default=None),
+) -> list[dict]:
+    user_id = _require_user(x_user_id)
+    return get_transaction_sources(user_id)
+
+
+@router.delete("/api/investments/sources/{source}")
+def delete_source(
+    source: str = Path(...),
+    x_user_id: str | None = Header(default=None),
+) -> dict:
+    user_id = _require_user(x_user_id)
+    actual_source = None if source == "legacy" else source
+    clear_transactions_for_source(user_id, actual_source)
+    invalidate_positions_cache(user_id)
+    return {"deleted": source}
 
 
 @router.get("/api/investments/transactions")
