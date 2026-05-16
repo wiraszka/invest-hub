@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import csv
 import io
+from datetime import datetime
+
+import openpyxl
 
 from services.symbols import clean_symbol, is_option, option_details, parse_float
 
@@ -44,6 +47,7 @@ def parse_csv(content: str) -> list[dict]:
 
         transactions.append(
             {
+                "source": "wealthsimple",
                 "transaction_date": transaction_date,
                 "account_type": (row.get("account_type") or "").strip(),
                 "activity_type": activity_type,
@@ -56,6 +60,103 @@ def parse_csv(content: str) -> list[dict]:
                 "unit_price": parse_float(row.get("unit_price") or ""),
                 "commission": parse_float(row.get("commission") or "") or 0.0,
                 "net_cash_amount": parse_float(row.get("net_cash_amount") or ""),
+            }
+        )
+
+    return transactions
+
+
+_QUESTRADE_SKIP_ACTIVITY_TYPES = {"FX conversion", "Deposits", "Withdrawals", "Other"}
+
+_QUESTRADE_ACTIVITY_MAP = {
+    "Trades": "Trade",
+    "Dividends": "Dividend",
+    "Corporate Actions": "CorporateAction",
+}
+
+
+def _parse_questrade_date(value: object) -> str | None:
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    text = str(value).strip()
+    # "2026-03-26 12:00:00 AM" or ISO-like — take the first 10 characters
+    return text[:10] if len(text) >= 10 and text[:4].isdigit() else None
+
+
+def _to_float(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def parse_questrade_xlsx(content: bytes) -> list[dict]:
+    """Parse a Questrade activities export XLSX into normalized transaction records.
+
+    Strips account number to avoid persisting sensitive identifiers.
+    Skips FX conversions, deposits, and withdrawals.
+    Dividend symbol IDs (Questrade internal codes) are discarded — symbol is set to None.
+    """
+    wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    wb.close()
+    if not rows:
+        return []
+
+    headers = [str(cell).strip() if cell is not None else "" for cell in rows[0]]
+    transactions = []
+
+    for raw_row in rows[1:]:
+        row: dict[str, object] = dict(zip(headers, raw_row))
+
+        activity_type_raw = str(row.get("Activity Type") or "").strip()
+        if not activity_type_raw or activity_type_raw in _QUESTRADE_SKIP_ACTIVITY_TYPES:
+            continue
+
+        activity_type = _QUESTRADE_ACTIVITY_MAP.get(activity_type_raw)
+        if not activity_type:
+            continue
+
+        transaction_date = _parse_questrade_date(row.get("Transaction Date"))
+        if not transaction_date:
+            continue
+
+        action = str(row.get("Action") or "").strip().upper()
+
+        if activity_type == "Trade":
+            activity_sub_type = action  # BUY or SELL
+            symbol_raw = str(row.get("Symbol") or "").strip() or None
+        elif activity_type == "Dividend":
+            activity_sub_type = "DIV"
+            # Questrade uses internal contract IDs as the dividend symbol — discard them
+            symbol_raw = None
+        else:
+            # CorporateAction
+            activity_sub_type = action
+            symbol_raw = str(row.get("Symbol") or "").strip() or None
+
+        account_type = str(row.get("Account Type") or "").strip()
+        currency = str(row.get("Currency") or "CAD").strip()
+        name = str(row.get("Description") or "").strip() or None
+
+        transactions.append(
+            {
+                "source": "questrade",
+                "transaction_date": transaction_date,
+                "account_type": account_type,
+                "activity_type": activity_type,
+                "activity_sub_type": activity_sub_type,
+                "symbol": clean_symbol(symbol_raw) if symbol_raw else None,
+                "raw_symbol": symbol_raw,
+                "name": name,
+                "currency": currency,
+                "quantity": _to_float(row.get("Quantity")),
+                "unit_price": _to_float(row.get("Price")),
+                "commission": _to_float(row.get("Commission")) or 0.0,
+                "net_cash_amount": _to_float(row.get("Net Amount")),
             }
         )
 

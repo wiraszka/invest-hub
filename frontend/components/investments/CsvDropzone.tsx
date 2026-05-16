@@ -12,7 +12,7 @@ interface Props {
 export default function CsvDropzone({
   userId,
   onUpload,
-  label = "↑ Re-upload CSV",
+  label = "↑ Re-upload",
   uploaded = false,
 }: Props) {
   const [dragging, setDragging] = useState(false);
@@ -87,7 +87,7 @@ export default function CsvDropzone({
         <input
           ref={inputRef}
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx"
           onChange={handleChange}
           className="hidden"
           data-testid="csv-file-input"
