@@ -186,11 +186,51 @@ def _symbol_metadata_collection() -> Collection:
 # ---------------------------------------------------------------------------
 
 
-def replace_transactions(user_id: str, transactions: list[dict]) -> None:
+def replace_transactions_for_source(
+    user_id: str,
+    source: str,
+    min_date: str,
+    max_date: str,
+    transactions: list[dict],
+) -> None:
     col = _transactions_collection()
-    col.delete_many({"user_id": user_id})
+    col.delete_many(
+        {
+            "user_id": user_id,
+            "source": source,
+            "transaction_date": {"$gte": min_date, "$lte": max_date},
+        }
+    )
     if transactions:
         col.insert_many([{"user_id": user_id, **t} for t in transactions])
+
+
+def get_transaction_sources(user_id: str) -> list[dict]:
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {
+            "$group": {
+                "_id": "$source",
+                "count": {"$sum": 1},
+                "min_date": {"$min": "$transaction_date"},
+                "max_date": {"$max": "$transaction_date"},
+            }
+        },
+        {"$sort": {"_id": 1}},
+    ]
+    return [
+        {
+            "source": doc["_id"],
+            "count": doc["count"],
+            "min_date": doc["min_date"],
+            "max_date": doc["max_date"],
+        }
+        for doc in _transactions_collection().aggregate(pipeline)
+    ]
+
+
+def clear_transactions_for_source(user_id: str, source: str | None) -> None:
+    _transactions_collection().delete_many({"user_id": user_id, "source": source})
 
 
 def get_transactions(user_id: str) -> list[dict]:
