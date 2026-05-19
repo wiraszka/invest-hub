@@ -1,13 +1,13 @@
 # invest-hub
 
-A personal investment research platform built on a FastAPI backend and Next.js frontend, deployed on Vercel.
+A personal investment tracking and stock research platform built on a FastAPI backend and Next.js frontend, deployed on Vercel.
 
 ## Features
 
-- **Research** — Search any SEC-registered company, trigger an LLM-driven analysis pipeline, and view a Company Snapshot, key financial metrics, charts, and a Data Integrity summary
+- **Investments** — Upload your Wealthsimple transaction history to track open positions, cost basis, realized P/L, and portfolio composition (asset type, sector, geography) via interactive charts
+- **Research** — Search any SEC-registered company, trigger an LLM-driven analysis pipeline, and view a Company Snapshot, key financial metrics, industry-specific charts, and a Data Integrity summary
 - **Commodities Sentiment** — Google Trends interest tracker for 11 commodities with a live line chart and momentum indicators
 - **Shortlist** — Save companies for quick re-access (in progress)
-- **Investments** — Personal portfolio tracking via Wealthsimple CSV import; positions table with sector labels, portfolio charts (asset type, sector, geography), and per-ticker metadata enrichment via FMP
 
 ## Tech Stack
 
@@ -15,24 +15,30 @@ A personal investment research platform built on a FastAPI backend and Next.js f
 |---|---|
 | Frontend | Next.js (React), Recharts, Tailwind CSS |
 | Backend | FastAPI (Python), Vercel serverless functions |
-| Database | MongoDB Atlas |
+| Database — app data | MongoDB Atlas |
+| Database — market data | PostgreSQL (Neon) |
 | Auth | Clerk |
 | LLM | Claude API (Anthropic) |
-| Price Data | TwelveData API (FMP as failover) |
+| Price Data | TwelveData API (FMP → yfinance fallback chain) |
 | Financial Data | Financial Modeling Prep (FMP) API |
-| Filing Data | SEC EDGAR API (submissions + filing text) |
+| Filing Data | SEC EDGAR API |
 | Sentiment Data | Google Trends (pytrends) |
+| Market Data | Finnhub API, yfinance |
+| Identity Resolution | OpenFIGI API |
 
 ## Project Structure
 
 ```
 invest-hub/
-├── frontend/          # Next.js app
-├── backend/           # FastAPI app
-│   ├── api/           # Entry point (index.py)
-│   ├── routers/       # Route handlers
-│   └── services/      # Business logic
-└── PROJECT_OUTLINE.md # Full architecture and feature spec
+├── frontend/           # Next.js app
+├── backend/            # FastAPI app
+│   ├── api/            # Entry point (index.py)
+│   ├── adapters/       # Market data provider adapters (hexagonal architecture)
+│   ├── core/           # Config, cache, exceptions
+│   ├── models/         # Canonical domain models
+│   ├── routers/        # Route handlers
+│   └── services/       # Business logic
+└── PROJECT_OUTLINE.md  # Full architecture and feature spec
 ```
 
 ## Setup
@@ -52,9 +58,9 @@ uvicorn api.index:app --reload
 
 ```bash
 cd frontend
-npm install
+pnpm install
 cp .env.local.example .env.local  # fill in keys
-npm run dev
+pnpm dev
 ```
 
 ## Environment Variables
@@ -65,15 +71,18 @@ npm run dev
 |---|---|
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `MONGODB_URI` | MongoDB Atlas connection string |
+| `DATABASE_URL` | Neon PostgreSQL connection string |
 | `TD_API_KEY` | TwelveData API key |
 | `FMP_API_KEY` | Financial Modeling Prep API key |
-| `SEC_CONTACT_EMAIL` | Contact email included in SEC EDGAR User-Agent (required by EDGAR API policy) |
+| `FINNHUB_API_KEY` | Finnhub API key |
+| `OPENFIGI_API_KEY` | OpenFIGI API key |
+| `SEC_CONTACT_EMAIL` | Contact email for SEC EDGAR User-Agent header |
 
 ### Frontend (`frontend/.env.local`)
 
 | Variable | Description |
 |---|---|
-| `NEXT_PUBLIC_BACKEND_URL` | Backend Vercel URL (e.g. `https://invest-hub-backend.vercel.app`) |
+| `NEXT_PUBLIC_BACKEND_URL` | Backend Vercel URL |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk frontend publishable key |
 | `CLERK_SECRET_KEY` | Clerk backend secret key |
 

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.16.0] - 2026-05-18
+
+### Added
+
+- Add hexagonal market data infrastructure — provider-agnostic adapter layer with FMP, Finnhub, and yfinance adapters; each adapter has per-adapter concurrency limiting and a circuit breaker
+- Add PostgreSQL (Neon) two-layer storage: raw ingestion tables (append-only audit trail per provider) and normalized canonical tables; identity resolution via OpenFIGI maps tickers to FIGI and ISIN across providers
+- Add `GET /api/v1/quote/{ticker}`, `GET /api/v1/financials/{ticker}`, and `GET /api/v1/profile/{ticker}` endpoints backed by an in-process TTL cache → PostgreSQL normalized layer → provider fallback chain
+
 ## [v1.15.0] - 2026-05-16
 
 ### Added
