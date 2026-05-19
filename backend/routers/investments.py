@@ -1,35 +1,17 @@
-from fastapi import (
-    APIRouter,
-    Body,
-    File,
-    Header,
-    HTTPException,
-    Path,
-    Query,
-    UploadFile,
-)
+from fastapi import APIRouter, Body, File, Header, HTTPException, Path, UploadFile
 
-from services.db import (
+from services.holdings import parse_holdings_csv
+from services.investments import build_positions, parse_csv, parse_questrade_xlsx
+from services.pg import (
     clear_transactions_for_source,
-    get_analysis,
-    get_holdings_cache,
-    get_positions_cache,
-    get_symbol_metadata,
-    get_symbol_metadata_batch,
+    get_holdings,
     get_transaction_sources,
     get_transactions,
     get_user_preferences,
-    invalidate_positions_cache,
     replace_transactions_for_source,
-    set_holdings_cache,
-    set_positions_cache,
-    upsert_symbol_metadata,
+    set_holdings,
     upsert_user_preferences,
 )
-from services.fmp import get_symbol_metadata as fetch_from_fmp
-from services.holdings import parse_holdings_csv
-from services.investments import build_positions, parse_csv, parse_questrade_xlsx
-from services.sec import get_sic_metadata as fetch_from_sec
 
 router = APIRouter()
 
@@ -41,7 +23,6 @@ def _require_user(x_user_id: str | None) -> str:
 
 
 def _detect_format(content: str) -> str:
-    """Detect CSV format by inspecting the header row."""
     first_line = content.split("\n")[0]
     if "Market Price" in first_line or "Book Value (CAD)" in first_line:
         return "holdings"
@@ -64,7 +45,7 @@ async def upload_csv(
         fmt = _detect_format(content)
         if fmt == "holdings":
             data = parse_holdings_csv(content)
-            set_holdings_cache(user_id, data)
+            await set_holdings(user_id, data)
             return {"type": "holdings", "count": len(data)}
         transactions = parse_csv(content)
 
@@ -74,44 +55,37 @@ async def upload_csv(
     source = transactions[0]["source"]
     min_date = min(t["transaction_date"] for t in transactions)
     max_date = max(t["transaction_date"] for t in transactions)
-    replace_transactions_for_source(user_id, source, min_date, max_date, transactions)
-    invalidate_positions_cache(user_id)
+    await replace_transactions_for_source(user_id, source, min_date, max_date, transactions)
     return {"type": "activities", "count": len(transactions)}
 
 
 @router.get("/api/investments/positions")
-def get_positions(
+async def get_positions(
     x_user_id: str | None = Header(default=None),
 ) -> list[dict]:
     user_id = _require_user(x_user_id)
-    cached = get_positions_cache(user_id)
-    if cached is not None:
-        return cached
-    transactions = get_transactions(user_id)
-    positions = build_positions(transactions)
-    set_positions_cache(user_id, positions)
-    return positions
+    transactions = await get_transactions(user_id)
+    return build_positions(transactions)
 
 
 @router.get("/api/investments/holdings")
-def get_holdings(
+async def get_holdings_route(
     x_user_id: str | None = Header(default=None),
 ) -> list[dict]:
     user_id = _require_user(x_user_id)
-    cached = get_holdings_cache(user_id)
-    return cached if cached is not None else []
+    return await get_holdings(user_id)
 
 
 @router.get("/api/investments/preferences")
-def get_preferences(
+async def get_preferences(
     x_user_id: str | None = Header(default=None),
 ) -> dict:
     user_id = _require_user(x_user_id)
-    return get_user_preferences(user_id)
+    return await get_user_preferences(user_id)
 
 
 @router.put("/api/investments/preferences")
-def put_preferences(
+async def put_preferences(
     x_user_id: str | None = Header(default=None),
     body: dict = Body(...),
 ) -> dict:
@@ -126,80 +100,32 @@ def put_preferences(
         "chart_value_mode",
     }
     prefs = {k: v for k, v in body.items() if k in allowed}
-    upsert_user_preferences(user_id, prefs)
+    await upsert_user_preferences(user_id, prefs)
     return prefs
 
 
 @router.get("/api/investments/sources")
-def list_sources(
+async def list_sources(
     x_user_id: str | None = Header(default=None),
 ) -> list[dict]:
     user_id = _require_user(x_user_id)
-    return get_transaction_sources(user_id)
+    return await get_transaction_sources(user_id)
 
 
 @router.delete("/api/investments/sources/{source}")
-def delete_source(
+async def delete_source(
     source: str = Path(...),
     x_user_id: str | None = Header(default=None),
 ) -> dict:
     user_id = _require_user(x_user_id)
     actual_source = None if source == "legacy" else source
-    clear_transactions_for_source(user_id, actual_source)
-    invalidate_positions_cache(user_id)
+    await clear_transactions_for_source(user_id, actual_source)
     return {"deleted": source}
 
 
 @router.get("/api/investments/transactions")
-def get_all_transactions(
+async def get_all_transactions(
     x_user_id: str | None = Header(default=None),
 ) -> list[dict]:
     user_id = _require_user(x_user_id)
-    return get_transactions(user_id)
-
-
-@router.post("/api/investments/metadata/{ticker}")
-def analyze_ticker_metadata(
-    ticker: str = Path(...),
-) -> dict:
-    """
-    Return cached symbol metadata for a ticker, fetching from FMP if missing or stale.
-    Also reports whether a full LLM analysis exists for this ticker.
-    """
-    cached = get_symbol_metadata(ticker)
-    if cached:
-        cached["has_analysis"] = get_analysis(ticker) is not None
-        return cached
-
-    fmp_data = fetch_from_fmp(ticker)
-    if fmp_data:
-        upsert_symbol_metadata(ticker, fmp_data)
-        result = get_symbol_metadata(ticker) or {**fmp_data, "ticker": ticker}
-        result["has_analysis"] = get_analysis(ticker) is not None
-        return result
-
-    sec_data = fetch_from_sec(ticker)
-    if not sec_data:
-        raise HTTPException(status_code=404, detail=f"No metadata found for {ticker}")
-
-    upsert_symbol_metadata(ticker, sec_data)
-    result = get_symbol_metadata(ticker) or {**sec_data, "ticker": ticker}
-    result["has_analysis"] = get_analysis(ticker) is not None
-    return result
-
-
-@router.get("/api/investments/metadata")
-def get_metadata_batch(
-    tickers: str = Query(..., description="Comma-separated list of ticker symbols"),
-) -> dict[str, dict]:
-    """
-    Return cached metadata for a batch of tickers (no FMP calls).
-    Includes has_analysis flag for each ticker found in cache.
-    """
-    ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
-    metadata = get_symbol_metadata_batch(ticker_list)
-
-    for ticker, doc in metadata.items():
-        doc["has_analysis"] = get_analysis(ticker) is not None
-
-    return metadata
+    return await get_transactions(user_id)
