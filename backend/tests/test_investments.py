@@ -181,7 +181,7 @@ def test_upload_activities_returns_count_and_type():
     with patch("routers.investments.replace_transactions_for_source", new=AsyncMock()) as mock_replace:
 
         response = client.post(
-            "/api/investments/upload",
+            "/api/v1/investments/upload",
             files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
             headers={"X-User-Id": "user_test123"},
         )
@@ -196,7 +196,7 @@ def test_upload_activities_returns_count_and_type():
 def test_upload_activities_tags_source_as_wealthsimple():
     with patch("routers.investments.replace_transactions_for_source", new=AsyncMock()) as mock_replace:
         client.post(
-            "/api/investments/upload",
+            "/api/v1/investments/upload",
             files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
             headers={"X-User-Id": "user_test123"},
         )
@@ -208,7 +208,7 @@ def test_upload_activities_tags_source_as_wealthsimple():
 def test_upload_holdings_returns_count_and_type():
     with patch("routers.investments.set_holdings", new=AsyncMock()) as mock_set:
         response = client.post(
-            "/api/investments/upload",
+            "/api/v1/investments/upload",
             files={"file": ("holdings.csv", HOLDINGS_CSV.encode(), "text/csv")},
             headers={"X-User-Id": "user_test123"},
         )
@@ -222,7 +222,7 @@ def test_upload_holdings_returns_count_and_type():
 
 def test_upload_requires_user_id():
     response = client.post(
-        "/api/investments/upload",
+        "/api/v1/investments/upload",
         files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
     )
 
@@ -230,13 +230,13 @@ def test_upload_requires_user_id():
 
 
 def test_get_positions_requires_user_id():
-    response = client.get("/api/investments/positions")
+    response = client.get("/api/v1/investments/positions")
 
     assert response.status_code == 401
 
 
 def test_get_sources_requires_user_id():
-    response = client.get("/api/investments/sources")
+    response = client.get("/api/v1/investments/sources")
 
     assert response.status_code == 401
 
@@ -248,7 +248,7 @@ def test_get_sources_returns_list():
 
     with patch("routers.investments.get_transaction_sources", new=AsyncMock(return_value=mock_sources)):
         response = client.get(
-            "/api/investments/sources",
+            "/api/v1/investments/sources",
             headers={"X-User-Id": "user_test123"},
         )
 
@@ -259,7 +259,7 @@ def test_get_sources_returns_list():
 
 
 def test_delete_source_requires_user_id():
-    response = client.delete("/api/investments/sources/wealthsimple")
+    response = client.delete("/api/v1/investments/sources/wealthsimple")
 
     assert response.status_code == 401
 
@@ -267,7 +267,7 @@ def test_delete_source_requires_user_id():
 def test_delete_source_clears_transactions():
     with patch("routers.investments.clear_transactions_for_source", new=AsyncMock()) as mock_clear:
         response = client.delete(
-            "/api/investments/sources/wealthsimple",
+            "/api/v1/investments/sources/wealthsimple",
             headers={"X-User-Id": "user_test123"},
         )
 
@@ -278,7 +278,7 @@ def test_delete_source_clears_transactions():
 def test_delete_legacy_source_passes_none():
     with patch("routers.investments.clear_transactions_for_source", new=AsyncMock()) as mock_clear:
         client.delete(
-            "/api/investments/sources/legacy",
+            "/api/v1/investments/sources/legacy",
             headers={"X-User-Id": "user_test123"},
         )
 
@@ -286,13 +286,13 @@ def test_delete_legacy_source_passes_none():
 
 
 def test_get_transactions_requires_user_id():
-    response = client.get("/api/investments/transactions")
+    response = client.get("/api/v1/investments/transactions")
 
     assert response.status_code == 401
 
 
 def test_get_holdings_requires_user_id():
-    response = client.get("/api/investments/holdings")
+    response = client.get("/api/v1/investments/holdings")
 
     assert response.status_code == 401
 
@@ -302,7 +302,7 @@ def test_get_holdings_returns_list():
 
     with patch("routers.investments.get_holdings", new=AsyncMock(return_value=mock_holdings)):
         response = client.get(
-            "/api/investments/holdings",
+            "/api/v1/investments/holdings",
             headers={"X-User-Id": "user_test123"},
         )
 
@@ -313,7 +313,7 @@ def test_get_holdings_returns_list():
 def test_get_holdings_returns_empty_list_when_no_holdings():
     with patch("routers.investments.get_holdings", new=AsyncMock(return_value=[])):
         response = client.get(
-            "/api/investments/holdings",
+            "/api/v1/investments/holdings",
             headers={"X-User-Id": "user_test123"},
         )
 
@@ -341,7 +341,7 @@ def test_get_positions_returns_list():
 
     with patch("routers.investments.get_transactions", new=AsyncMock(return_value=mock_txns)):
         response = client.get(
-            "/api/investments/positions",
+            "/api/v1/investments/positions",
             headers={"X-User-Id": "user_test123"},
         )
 
@@ -370,7 +370,7 @@ def test_get_transactions_returns_list():
 
     with patch("routers.investments.get_transactions", new=AsyncMock(return_value=mock_txns)):
         response = client.get(
-            "/api/investments/transactions",
+            "/api/v1/investments/transactions",
             headers={"X-User-Id": "user_test123"},
         )
 
@@ -384,7 +384,7 @@ def test_get_transactions_returns_list():
 
 
 def test_get_preferences_requires_user_id():
-    response = client.get("/api/investments/preferences")
+    response = client.get("/api/v1/investments/preferences")
 
     assert response.status_code == 401
 
@@ -399,7 +399,7 @@ def test_get_preferences_returns_defaults_when_none_stored():
         }),
     ):
         response = client.get(
-            "/api/investments/preferences",
+            "/api/v1/investments/preferences",
             headers={"X-User-Id": "user_test123"},
         )
 
@@ -412,7 +412,7 @@ def test_get_preferences_returns_defaults_when_none_stored():
 
 def test_put_preferences_requires_user_id():
     response = client.put(
-        "/api/investments/preferences",
+        "/api/v1/investments/preferences",
         json={"grouping_labels": ["Tech"]},
     )
 
@@ -428,7 +428,7 @@ def test_put_preferences_persists_and_returns_prefs():
 
     with patch("routers.investments.upsert_user_preferences", new=AsyncMock()) as mock_upsert:
         response = client.put(
-            "/api/investments/preferences",
+            "/api/v1/investments/preferences",
             json=prefs,
             headers={"X-User-Id": "user_test123"},
         )
@@ -444,7 +444,7 @@ def test_put_preferences_persists_and_returns_prefs():
 def test_put_preferences_strips_unknown_keys():
     with patch("routers.investments.upsert_user_preferences", new=AsyncMock()):
         response = client.put(
-            "/api/investments/preferences",
+            "/api/v1/investments/preferences",
             json={"grouping_labels": ["Tech"], "malicious_key": "bad"},
             headers={"X-User-Id": "user_test123"},
         )

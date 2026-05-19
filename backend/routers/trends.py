@@ -19,10 +19,10 @@ COMMODITIES: dict[str, str] = {
     "Antimony": "antimony",
 }
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1")
 
 
-@router.get("/api/trends")
+@router.get("/trends")
 async def trends(
     commodities: list[str] = Query(...),
     timeframe: str = Query("Past 1 month"),

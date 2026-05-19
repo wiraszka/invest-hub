@@ -42,7 +42,7 @@ export function AnalyzeProvider({ children }: { children: ReactNode }) {
 
       try {
         const metaRes = await fetch(
-          `${base}/api/investments/metadata/${ticker}`,
+          `${base}/api/v1/investments/metadata/${ticker}`,
           {
             method: "POST",
           },

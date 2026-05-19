@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Body, File, Header, HTTPException, Path, UploadFile
 
 from services.holdings import parse_holdings_csv
@@ -13,7 +15,7 @@ from services.pg import (
     upsert_user_preferences,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1")
 
 
 def _require_user(x_user_id: str | None) -> str:
@@ -29,7 +31,7 @@ def _detect_format(content: str) -> str:
     return "activities"
 
 
-@router.post("/api/investments/upload")
+@router.post("/investments/upload")
 async def upload_csv(
     file: UploadFile = File(...),
     x_user_id: str | None = Header(default=None),
@@ -59,7 +61,7 @@ async def upload_csv(
     return {"type": "activities", "count": len(transactions)}
 
 
-@router.get("/api/investments/positions")
+@router.get("/investments/positions")
 async def get_positions(
     x_user_id: str | None = Header(default=None),
 ) -> list[dict]:
@@ -68,7 +70,7 @@ async def get_positions(
     return build_positions(transactions)
 
 
-@router.get("/api/investments/holdings")
+@router.get("/investments/holdings")
 async def get_holdings_route(
     x_user_id: str | None = Header(default=None),
 ) -> list[dict]:
@@ -76,7 +78,7 @@ async def get_holdings_route(
     return await get_holdings(user_id)
 
 
-@router.get("/api/investments/preferences")
+@router.get("/investments/preferences")
 async def get_preferences(
     x_user_id: str | None = Header(default=None),
 ) -> dict:
@@ -84,7 +86,7 @@ async def get_preferences(
     return await get_user_preferences(user_id)
 
 
-@router.put("/api/investments/preferences")
+@router.put("/investments/preferences")
 async def put_preferences(
     x_user_id: str | None = Header(default=None),
     body: dict = Body(...),
@@ -104,7 +106,7 @@ async def put_preferences(
     return prefs
 
 
-@router.get("/api/investments/sources")
+@router.get("/investments/sources")
 async def list_sources(
     x_user_id: str | None = Header(default=None),
 ) -> list[dict]:
@@ -112,7 +114,7 @@ async def list_sources(
     return await get_transaction_sources(user_id)
 
 
-@router.delete("/api/investments/sources/{source}")
+@router.delete("/investments/sources/{source}")
 async def delete_source(
     source: str = Path(...),
     x_user_id: str | None = Header(default=None),
@@ -123,7 +125,7 @@ async def delete_source(
     return {"deleted": source}
 
 
-@router.get("/api/investments/transactions")
+@router.get("/investments/transactions")
 async def get_all_transactions(
     x_user_id: str | None = Header(default=None),
 ) -> list[dict]:
