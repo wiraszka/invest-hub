@@ -4,7 +4,7 @@ Personal investment tracking and stock research platform. Upload brokerage trans
 
 ## Features
 
-- **Investments** — Upload Wealthsimple or Questrade transaction history; track open positions, cost basis, realized P/L, and portfolio composition via donut charts. No external API calls — works entirely from uploaded data.
+- **Investments** — Upload Wealthsimple or Questrade transaction history; track open positions, cost basis, realized P/L, and portfolio composition via donut charts.
 - **Symbol page** — Live price chart for any ticker (TwelveData → FMP fallback)
 - **Research** — Search any SEC-registered ticker; AI analysis pipeline in active redesign
 - **Commodities Sentiment** — Google Trends interest for 11 commodities with momentum indicators and a line chart
@@ -68,15 +68,7 @@ pnpm dev
 
 ## Database Migrations
 
-Schema is managed by Alembic. On first run against an existing Neon DB (schema was applied manually before migrations were added):
-
 ```bash
 cd backend
-alembic stamp 0001
-```
-
-On a fresh database:
-
-```bash
 alembic upgrade head
 ```
