@@ -7,10 +7,9 @@ from logging.config import fileConfig
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
-
-from dotenv import load_dotenv
 
 from alembic import context
 
