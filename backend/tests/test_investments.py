@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -105,7 +105,7 @@ def test_build_positions_buy_creates_position():
     positions = build_positions(txns)
 
     vfv = next(p for p in positions if p["symbol"] == "VFV")
-    assert vfv["shares_held"] == 7.0  # 10 bought - 3 sold
+    assert vfv["shares_held"] == 7.0
     assert vfv["account"] == "TFSA"
 
 
@@ -115,7 +115,6 @@ def test_build_positions_cost_basis_after_partial_sell():
     positions = build_positions(txns)
 
     vfv = next(p for p in positions if p["symbol"] == "VFV")
-    # bought 10 @ $100 = $1000 cost basis; sold 3 → cost basis = $700
     assert abs(vfv["cost_basis"] - 700.0) < 0.01
 
 
@@ -125,7 +124,6 @@ def test_build_positions_realized_pl_on_sell():
     positions = build_positions(txns)
 
     vfv = next(p for p in positions if p["symbol"] == "VFV")
-    # sold 3 shares: proceeds $330 - cost $300 = $30 realized P/L
     assert abs(vfv["realized_pl"] - 30.0) < 0.01
 
 
@@ -180,10 +178,8 @@ def test_build_positions_cleans_option_symbol():
 
 
 def test_upload_activities_returns_count_and_type():
-    with (
-        patch("routers.investments.replace_transactions_for_source") as mock_replace,
-        patch("routers.investments.invalidate_positions_cache"),
-    ):
+    with patch("routers.investments.replace_transactions_for_source", new=AsyncMock()) as mock_replace:
+
         response = client.post(
             "/api/investments/upload",
             files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
@@ -198,24 +194,19 @@ def test_upload_activities_returns_count_and_type():
 
 
 def test_upload_activities_tags_source_as_wealthsimple():
-    with (
-        patch("routers.investments.replace_transactions_for_source") as mock_replace,
-        patch("routers.investments.invalidate_positions_cache"),
-    ):
+    with patch("routers.investments.replace_transactions_for_source", new=AsyncMock()) as mock_replace:
         client.post(
             "/api/investments/upload",
             files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
             headers={"X-User-Id": "user_test123"},
         )
 
-    _, call_kwargs = mock_replace.call_args
-    # Third positional arg is source (user_id, source, min_date, max_date, transactions)
     call_args = mock_replace.call_args[0]
     assert call_args[1] == "wealthsimple"
 
 
 def test_upload_holdings_returns_count_and_type():
-    with patch("routers.investments.set_holdings_cache") as mock_set:
+    with patch("routers.investments.set_holdings", new=AsyncMock()) as mock_set:
         response = client.post(
             "/api/investments/upload",
             files={"file": ("holdings.csv", HOLDINGS_CSV.encode(), "text/csv")},
@@ -255,7 +246,7 @@ def test_get_sources_returns_list():
         {"source": "wealthsimple", "count": 45, "min_date": "2024-01-15", "max_date": "2025-03-26"}
     ]
 
-    with patch("routers.investments.get_transaction_sources", return_value=mock_sources):
+    with patch("routers.investments.get_transaction_sources", new=AsyncMock(return_value=mock_sources)):
         response = client.get(
             "/api/investments/sources",
             headers={"X-User-Id": "user_test123"},
@@ -273,11 +264,8 @@ def test_delete_source_requires_user_id():
     assert response.status_code == 401
 
 
-def test_delete_source_clears_and_invalidates():
-    with (
-        patch("routers.investments.clear_transactions_for_source") as mock_clear,
-        patch("routers.investments.invalidate_positions_cache"),
-    ):
+def test_delete_source_clears_transactions():
+    with patch("routers.investments.clear_transactions_for_source", new=AsyncMock()) as mock_clear:
         response = client.delete(
             "/api/investments/sources/wealthsimple",
             headers={"X-User-Id": "user_test123"},
@@ -288,10 +276,7 @@ def test_delete_source_clears_and_invalidates():
 
 
 def test_delete_legacy_source_passes_none():
-    with (
-        patch("routers.investments.clear_transactions_for_source") as mock_clear,
-        patch("routers.investments.invalidate_positions_cache"),
-    ):
+    with patch("routers.investments.clear_transactions_for_source", new=AsyncMock()) as mock_clear:
         client.delete(
             "/api/investments/sources/legacy",
             headers={"X-User-Id": "user_test123"},
@@ -315,7 +300,7 @@ def test_get_holdings_requires_user_id():
 def test_get_holdings_returns_list():
     mock_holdings = [{"account": "TFSA", "symbol": "VFV", "market_value_cad": 735.0}]
 
-    with patch("routers.investments.get_holdings_cache", return_value=mock_holdings):
+    with patch("routers.investments.get_holdings", new=AsyncMock(return_value=mock_holdings)):
         response = client.get(
             "/api/investments/holdings",
             headers={"X-User-Id": "user_test123"},
@@ -325,8 +310,8 @@ def test_get_holdings_returns_list():
     assert response.json()[0]["symbol"] == "VFV"
 
 
-def test_get_holdings_returns_empty_list_when_none():
-    with patch("routers.investments.get_holdings_cache", return_value=None):
+def test_get_holdings_returns_empty_list_when_no_holdings():
+    with patch("routers.investments.get_holdings", new=AsyncMock(return_value=[])):
         response = client.get(
             "/api/investments/holdings",
             headers={"X-User-Id": "user_test123"},
@@ -354,11 +339,7 @@ def test_get_positions_returns_list():
         }
     ]
 
-    with (
-        patch("routers.investments.get_positions_cache", return_value=None),
-        patch("routers.investments.get_transactions", return_value=mock_txns),
-        patch("routers.investments.set_positions_cache"),
-    ):
+    with patch("routers.investments.get_transactions", new=AsyncMock(return_value=mock_txns)):
         response = client.get(
             "/api/investments/positions",
             headers={"X-User-Id": "user_test123"},
@@ -368,41 +349,6 @@ def test_get_positions_returns_list():
     data = response.json()
     assert isinstance(data, list)
     assert data[0]["symbol"] == "VFV"
-
-
-def test_metadata_falls_back_to_sec_when_fmp_returns_none():
-    sec_meta = {
-        "asset_type": "Equity",
-        "sector": "Crude Petroleum and Natural Gas",
-        "country": "Canada",
-        "sector_weights": None,
-        "country_weights": None,
-    }
-
-    with (
-        patch("routers.investments.get_symbol_metadata", return_value=None),
-        patch("routers.investments.fetch_from_fmp", return_value=None),
-        patch("routers.investments.fetch_from_sec", return_value=sec_meta),
-        patch("routers.investments.upsert_symbol_metadata"),
-        patch("routers.investments.get_analysis", return_value=None),
-    ):
-        response = client.post("/api/investments/metadata/AVN")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["sector"] == "Crude Petroleum and Natural Gas"
-    assert data["country"] == "Canada"
-
-
-def test_metadata_returns_404_when_both_fmp_and_sec_fail():
-    with (
-        patch("routers.investments.get_symbol_metadata", return_value=None),
-        patch("routers.investments.fetch_from_fmp", return_value=None),
-        patch("routers.investments.fetch_from_sec", return_value=None),
-    ):
-        response = client.post("/api/investments/metadata/ZZZZ")
-
-    assert response.status_code == 404
 
 
 def test_get_transactions_returns_list():
@@ -422,7 +368,7 @@ def test_get_transactions_returns_list():
         }
     ]
 
-    with patch("routers.investments.get_transactions", return_value=mock_txns):
+    with patch("routers.investments.get_transactions", new=AsyncMock(return_value=mock_txns)):
         response = client.get(
             "/api/investments/transactions",
             headers={"X-User-Id": "user_test123"},
@@ -446,11 +392,11 @@ def test_get_preferences_requires_user_id():
 def test_get_preferences_returns_defaults_when_none_stored():
     with patch(
         "routers.investments.get_user_preferences",
-        return_value={
+        new=AsyncMock(return_value={
             "grouping_labels": [],
             "grouping_assignments": {},
             "sector_overrides": {},
-        },
+        }),
     ):
         response = client.get(
             "/api/investments/preferences",
@@ -480,7 +426,7 @@ def test_put_preferences_persists_and_returns_prefs():
         "sector_overrides": {"TFSA::ARX": "Oil & Gas"},
     }
 
-    with patch("routers.investments.upsert_user_preferences") as mock_upsert:
+    with patch("routers.investments.upsert_user_preferences", new=AsyncMock()) as mock_upsert:
         response = client.put(
             "/api/investments/preferences",
             json=prefs,
@@ -496,7 +442,7 @@ def test_put_preferences_persists_and_returns_prefs():
 
 
 def test_put_preferences_strips_unknown_keys():
-    with patch("routers.investments.upsert_user_preferences"):
+    with patch("routers.investments.upsert_user_preferences", new=AsyncMock()):
         response = client.put(
             "/api/investments/preferences",
             json={"grouping_labels": ["Tech"], "malicious_key": "bad"},

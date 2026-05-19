@@ -224,7 +224,7 @@ def test_get_quote_price_returns_float():
     assert result == 42.50
 
 
-def test_get_quote_price_strips_to_suffix_when_first_attempt_empty():
+def test_get_quote_price_retries_without_to_suffix():
     # Stable API doesn't support .TO — fallback tries stripping the suffix
     responses = [
         _mock_response([]),
