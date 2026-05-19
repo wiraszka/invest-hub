@@ -4,7 +4,7 @@ import os
 
 import requests
 
-_BASE = "https://financialmodelingprep.com/api/v3"
+_BASE = "https://financialmodelingprep.com/stable"
 
 
 def _api_key() -> str:
@@ -14,11 +14,11 @@ def _api_key() -> str:
     return key
 
 
-def _get(path: str) -> list | dict | None:
+def _get(path: str, **params) -> list | dict | None:
     try:
         res = requests.get(
             f"{_BASE}{path}",
-            params={"apikey": _api_key()},
+            params={"apikey": _api_key(), **params},
             timeout=10,
         )
         if not res.ok:
@@ -29,47 +29,19 @@ def _get(path: str) -> list | dict | None:
         return None
 
 
-def _parse_weight(raw: str | float | None) -> float:
-    if raw is None:
-        return 0.0
-    if isinstance(raw, (int, float)):
-        return float(raw)
-    return float(str(raw).rstrip("%").strip() or 0)
-
 
 def _resolve_ticker(symbol: str) -> tuple[str, list | None]:
-    """Try symbol as-is, then with .TO suffix for Canadian listings."""
-    for candidate in [symbol, f"{symbol}.TO"]:
-        data = _get(f"/profile/{candidate}")
+    """Try symbol as-is; if it ends with .TO also try without the suffix (US cross-listing)."""
+    data = _get("/profile", symbol=symbol)
+    if data and isinstance(data, list) and len(data) > 0:
+        return symbol, data
+    if symbol.endswith(".TO"):
+        base = symbol[:-3]
+        data = _get("/profile", symbol=base)
         if data and isinstance(data, list) and len(data) > 0:
-            return candidate, data
+            return base, data
     return symbol, None
 
-
-def _etf_sector_weights(fmp_ticker: str) -> list[dict] | None:
-    data = _get(f"/etf-sector-weightings/{fmp_ticker}")
-    if not data or not isinstance(data, list):
-        return None
-    result = []
-    for item in data:
-        sector = item.get("sector")
-        weight = _parse_weight(item.get("weightPercentage"))
-        if sector and weight > 0:
-            result.append({"sector": sector, "weight": weight})
-    return result or None
-
-
-def _etf_country_weights(fmp_ticker: str) -> list[dict] | None:
-    data = _get(f"/etf-country-weightings/{fmp_ticker}")
-    if not data or not isinstance(data, list):
-        return None
-    result = []
-    for item in data:
-        country = item.get("country")
-        weight = _parse_weight(item.get("weightPercentage"))
-        if country and weight > 0:
-            result.append({"country": country, "weight": weight})
-    return result or None
 
 
 def get_financials(symbol: str) -> dict | None:
@@ -82,7 +54,7 @@ def get_financials(symbol: str) -> dict | None:
     if not profile_data:
         return None
 
-    income_raw = _get(f"/income-statement/{fmp_ticker}?limit=3")
+    income_raw = _get("/income-statement", symbol=fmp_ticker, limit=3)
     if not income_raw or not isinstance(income_raw, list):
         return None
 
@@ -90,7 +62,7 @@ def get_financials(symbol: str) -> dict | None:
 
     income = []
     for entry in income_raw:
-        year_raw = entry.get("calendarYear") or entry.get("date", "")[:4]
+        year_raw = entry.get("fiscalYear") or entry.get("date", "")[:4]
         income.append({
             "year": int(year_raw) if year_raw else None,
             "revenue": entry.get("revenue"),
@@ -101,7 +73,7 @@ def get_financials(symbol: str) -> dict | None:
         })
 
     balance: dict = {}
-    balance_raw = _get(f"/balance-sheet-statement/{fmp_ticker}?limit=1")
+    balance_raw = _get("/balance-sheet-statement", symbol=fmp_ticker, limit=1)
     if balance_raw and isinstance(balance_raw, list) and len(balance_raw) > 0:
         latest_balance = balance_raw[0]
         balance = {
@@ -113,10 +85,10 @@ def get_financials(symbol: str) -> dict | None:
         }
 
     cash_flow: list = []
-    cashflow_raw = _get(f"/cash-flow-statement/{fmp_ticker}?limit=3")
+    cashflow_raw = _get("/cash-flow-statement", symbol=fmp_ticker, limit=3)
     if cashflow_raw and isinstance(cashflow_raw, list):
         for entry in cashflow_raw:
-            year_raw = entry.get("calendarYear") or entry.get("date", "")[:4]
+            year_raw = entry.get("fiscalYear") or entry.get("date", "")[:4]
             cash_flow.append({
                 "year": int(year_raw) if year_raw else None,
                 "operating_cash_flow": entry.get("operatingCashFlow"),
@@ -125,16 +97,14 @@ def get_financials(symbol: str) -> dict | None:
             })
 
     metrics: dict = {}
-    metrics_raw = _get(f"/key-metrics/{fmp_ticker}?limit=1")
+    metrics_raw = _get("/key-metrics", symbol=fmp_ticker, limit=1)
     if metrics_raw and isinstance(metrics_raw, list) and len(metrics_raw) > 0:
         latest_metrics = metrics_raw[0]
         metrics = {
             "market_cap": latest_metrics.get("marketCap"),
             "enterprise_value": latest_metrics.get("enterpriseValue"),
-            "pe_ratio": latest_metrics.get("peRatio"),
-            "ev_ebitda": latest_metrics.get("evToEbitda"),
-            "price_to_book": latest_metrics.get("pbRatio"),
-            "roe": latest_metrics.get("roe"),
+            "ev_ebitda": latest_metrics.get("evToEBITDA"),
+            "roe": latest_metrics.get("returnOnEquity"),
         }
 
     return {
@@ -157,8 +127,8 @@ def get_profile_description(symbol: str) -> str | None:
 
 def get_quote_price(symbol: str) -> float | None:
     """Return current price from FMP quote endpoint. Used as TwelveData failover."""
-    for candidate in [symbol, f"{symbol}.TO"]:
-        data = _get(f"/quote/{candidate}")
+    for candidate in [symbol, symbol[:-3] if symbol.endswith(".TO") else f"{symbol}.TO"]:
+        data = _get("/quote", symbol=candidate)
         if data and isinstance(data, list) and len(data) > 0:
             price = data[0].get("price")
             if price is not None:
@@ -184,8 +154,8 @@ def get_symbol_metadata(symbol: str) -> dict | None:
             "asset_type": "ETF",
             "sector": None,
             "country": None,
-            "sector_weights": _etf_sector_weights(fmp_ticker),
-            "country_weights": _etf_country_weights(fmp_ticker),
+            "sector_weights": None,
+            "country_weights": None,
         }
 
     return {

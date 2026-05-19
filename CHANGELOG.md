@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.17.0] - 2026-05-19
+
+### Fixed
+
+- Migrate all FMP API calls from the deprecated `/api/v3` endpoints (blocked with 403 for keys issued after August 2025) to the new `/stable` base URL — restores quotes, financials, profiles, and price failover across the analysis pipeline and investments metadata flow
+- Update FMP field mappings for the stable API: `fiscalYear` replaces `calendarYear`, `evToEBITDA` and `returnOnEquity` replace their v3 equivalents; `exchangeShortName` replaced by `exchange` in profile responses
+- Drop ETF sector/country weighting calls from FMP — those endpoints require a paid tier and returned empty responses
+
 ## [v1.16.0] - 2026-05-18
 
 ### Added
@@ -276,6 +284,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.17.0]: https://github.com/wiraszka/invest-hub/compare/v1.16.0...v1.17.0
+[v1.16.0]: https://github.com/wiraszka/invest-hub/compare/v1.15.0...v1.16.0
+[v1.15.0]: https://github.com/wiraszka/invest-hub/compare/v1.14.0...v1.15.0
 [v1.14.0]: https://github.com/wiraszka/invest-hub/compare/v1.13.0...v1.14.0
 [v1.13.0]: https://github.com/wiraszka/invest-hub/compare/v1.12.0...v1.13.0
 [v1.12.0]: https://github.com/wiraszka/invest-hub/compare/v1.11.0...v1.12.0

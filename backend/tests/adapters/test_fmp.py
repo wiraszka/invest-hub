@@ -63,7 +63,7 @@ class TestGetQuote:
 class TestGetFinancials:
     async def test_returns_financials_on_success(self, adapter: FMPAdapter) -> None:
         income_payload = [{
-            "calendarYear": "2024",
+            "fiscalYear": "2024",
             "reportedCurrency": "USD",
             "revenue": 100_000_000,
             "grossProfit": 60_000_000,
@@ -72,7 +72,7 @@ class TestGetFinancials:
             "ebitda": 35_000_000,
         }]
         balance_payload = [{
-            "calendarYear": "2024",
+            "fiscalYear": "2024",
             "cashAndCashEquivalents": 5_000_000,
             "totalDebt": 10_000_000,
             "netDebt": 5_000_000,
@@ -80,7 +80,7 @@ class TestGetFinancials:
             "totalAssets": 80_000_000,
         }]
 
-        async def mock_get(client, path: str):
+        async def mock_get(client, path: str, **params):
             if "income-statement" in path:
                 return income_payload
             if "balance-sheet" in path:

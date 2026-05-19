@@ -24,7 +24,7 @@ MOCK_PROFILE = [
 MOCK_INCOME = [
     {
         "date": "2024-01-31",
-        "calendarYear": "2024",
+        "fiscalYear": "2024",
         "reportedCurrency": "USD",
         "revenue": 10_000_000,
         "grossProfit": 4_000_000,
@@ -34,7 +34,7 @@ MOCK_INCOME = [
     },
     {
         "date": "2023-01-31",
-        "calendarYear": "2023",
+        "fiscalYear": "2023",
         "reportedCurrency": "USD",
         "revenue": 8_000_000,
         "grossProfit": 3_200_000,
@@ -58,22 +58,22 @@ MOCK_BALANCE = [
 MOCK_CASHFLOW = [
     {
         "date": "2024-01-31",
-        "calendarYear": "2024",
+        "fiscalYear": "2024",
         "operatingCashFlow": 5_000_000,
         "capitalExpenditure": -1_000_000,
         "freeCashFlow": 4_000_000,
     }
 ]
 
+# Stable API key-metrics no longer returns peRatio or pbRatio
 MOCK_METRICS = [
     {
         "date": "2024-01-31",
+        "fiscalYear": "2024",
         "marketCap": 500_000_000,
         "enterpriseValue": 470_000_000,
-        "peRatio": 25.0,
-        "evToEbitda": 18.8,
-        "pbRatio": 2.5,
-        "roe": 0.075,
+        "evToEBITDA": 18.8,
+        "returnOnEquity": 0.075,
     }
 ]
 
@@ -143,32 +143,12 @@ def test_get_financials_key_metrics_parsed_correctly():
     m = result["metrics"]
     assert m["market_cap"] == 500_000_000
     assert m["enterprise_value"] == 470_000_000
-    assert m["pe_ratio"] == 25.0
     assert m["ev_ebitda"] == 18.8
-    assert m["price_to_book"] == 2.5
     assert m["roe"] == 0.075
-
-
-def test_get_financials_uses_to_suffix_for_canadian_tickers():
-    responses = [
-        _mock_response([]),
-        _mock_response(MOCK_PROFILE),
-        _mock_response(MOCK_INCOME),
-        _mock_response(MOCK_BALANCE),
-        _mock_response(MOCK_CASHFLOW),
-        _mock_response(MOCK_METRICS),
-    ]
-
-    with patch("services.fmp.requests.get", side_effect=responses):
-        result = get_financials("BNS")
-
-    assert result is not None
-    assert result["fmp_ticker"] == "BNS.TO"
 
 
 def test_get_financials_returns_none_when_ticker_not_found():
     with patch("services.fmp.requests.get", side_effect=[
-        _mock_response([]),
         _mock_response([]),
     ]):
         result = get_financials("XXXX")
@@ -217,7 +197,6 @@ def test_get_profile_description_returns_text():
 def test_get_profile_description_returns_none_when_not_found():
     with patch("services.fmp.requests.get", side_effect=[
         _mock_response([]),
-        _mock_response([]),
     ]):
         result = get_profile_description("XXXX")
 
@@ -245,14 +224,15 @@ def test_get_quote_price_returns_float():
     assert result == 42.50
 
 
-def test_get_quote_price_uses_to_suffix_when_first_attempt_empty():
+def test_get_quote_price_strips_to_suffix_when_first_attempt_empty():
+    # Stable API doesn't support .TO — fallback tries stripping the suffix
     responses = [
         _mock_response([]),
         _mock_response(MOCK_QUOTE),
     ]
 
     with patch("services.fmp.requests.get", side_effect=responses):
-        result = get_quote_price("BNS")
+        result = get_quote_price("BNS.TO")
 
     assert result == 42.50
 

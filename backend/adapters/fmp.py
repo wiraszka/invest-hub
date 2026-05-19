@@ -19,7 +19,7 @@ from models.market_data import (
     Quote,
 )
 
-_BASE = "https://financialmodelingprep.com/api/v3"
+_BASE = "https://financialmodelingprep.com/stable"
 
 
 class FMPAdapter(IMarketDataAdapter):
@@ -35,11 +35,11 @@ class FMPAdapter(IMarketDataAdapter):
             cooldown_seconds=settings.circuit_cooldown_seconds,
         )
 
-    async def _get(self, client: httpx.AsyncClient, path: str) -> list | dict | None:
+    async def _get(self, client: httpx.AsyncClient, path: str, **params) -> list | dict | None:
         try:
             response = await client.get(
                 f"{_BASE}{path}",
-                params={"apikey": settings.fmp_api_key},
+                params={"apikey": settings.fmp_api_key, **params},
                 timeout=10,
             )
             if not response.is_success:
@@ -58,7 +58,7 @@ class FMPAdapter(IMarketDataAdapter):
         async with self._semaphore:
             try:
                 async with httpx.AsyncClient() as client:
-                    raw = await self._get(client, f"/quote/{ticker}")
+                    raw = await self._get(client, "/quote", symbol=ticker)
                     if not raw or not isinstance(raw, list) or not raw[0].get("price"):
                         self._circuit.record_failure()
                         return self.error_response(f"No quote data for {ticker}")
@@ -67,7 +67,7 @@ class FMPAdapter(IMarketDataAdapter):
                     quote = Quote(
                         symbol=ticker,
                         price=float(entry["price"]),
-                        currency=entry.get("currency", "USD"),
+                        currency="USD",
                         source=self.name,
                         fetched_at=self.now(),
                     )
@@ -87,10 +87,10 @@ class FMPAdapter(IMarketDataAdapter):
             try:
                 async with httpx.AsyncClient() as client:
                     income_raw, balance_raw, cashflow_raw, metrics_raw = await asyncio.gather(
-                        self._get(client, f"/income-statement/{ticker}?limit=3"),
-                        self._get(client, f"/balance-sheet-statement/{ticker}?limit=1"),
-                        self._get(client, f"/cash-flow-statement/{ticker}?limit=3"),
-                        self._get(client, f"/key-metrics/{ticker}?limit=1"),
+                        self._get(client, "/income-statement", symbol=ticker, limit=3),
+                        self._get(client, "/balance-sheet-statement", symbol=ticker, limit=1),
+                        self._get(client, "/cash-flow-statement", symbol=ticker, limit=3),
+                        self._get(client, "/key-metrics", symbol=ticker, limit=1),
                     )
 
                 if not income_raw or not isinstance(income_raw, list):
@@ -101,8 +101,8 @@ class FMPAdapter(IMarketDataAdapter):
 
                 income = [
                     IncomeStatement(
-                        period=f"FY{entry.get('calendarYear') or entry.get('date', '')[:4]}",
-                        fiscal_year=int(entry["calendarYear"]) if entry.get("calendarYear") else None,
+                        period=f"FY{entry.get('fiscalYear') or entry.get('date', '')[:4]}",
+                        fiscal_year=int(entry["fiscalYear"]) if entry.get("fiscalYear") else None,
                         revenue=entry.get("revenue"),
                         gross_profit=entry.get("grossProfit"),
                         operating_income=entry.get("operatingIncome"),
@@ -115,7 +115,7 @@ class FMPAdapter(IMarketDataAdapter):
                 balance: BalanceSheet | None = None
                 if balance_raw and isinstance(balance_raw, list) and balance_raw:
                     entry = balance_raw[0]
-                    period = f"FY{entry.get('calendarYear') or entry.get('date', '')[:4]}"
+                    period = f"FY{entry.get('fiscalYear') or entry.get('date', '')[:4]}"
                     balance = BalanceSheet(
                         period=period,
                         cash=entry.get("cashAndCashEquivalents"),
@@ -129,7 +129,7 @@ class FMPAdapter(IMarketDataAdapter):
                 if cashflow_raw and isinstance(cashflow_raw, list):
                     cash_flow = [
                         CashFlow(
-                            period=f"FY{entry.get('calendarYear') or entry.get('date', '')[:4]}",
+                            period=f"FY{entry.get('fiscalYear') or entry.get('date', '')[:4]}",
                             operating_cash_flow=entry.get("operatingCashFlow"),
                             capex=entry.get("capitalExpenditure"),
                             free_cash_flow=entry.get("freeCashFlow"),
@@ -140,15 +140,13 @@ class FMPAdapter(IMarketDataAdapter):
                 metrics: KeyMetrics | None = None
                 if metrics_raw and isinstance(metrics_raw, list) and metrics_raw:
                     entry = metrics_raw[0]
-                    period = f"FY{entry.get('calendarYear') or entry.get('date', '')[:4]}"
+                    period = f"FY{entry.get('fiscalYear') or entry.get('date', '')[:4]}"
                     metrics = KeyMetrics(
                         period=period,
                         market_cap=entry.get("marketCap"),
                         enterprise_value=entry.get("enterpriseValue"),
-                        pe_ratio=entry.get("peRatio"),
-                        ev_ebitda=entry.get("evToEbitda"),
-                        price_to_book=entry.get("pbRatio"),
-                        roe=entry.get("roe"),
+                        ev_ebitda=entry.get("evToEBITDA"),
+                        roe=entry.get("returnOnEquity"),
                     )
 
                 raw_combined = {
@@ -182,7 +180,7 @@ class FMPAdapter(IMarketDataAdapter):
         async with self._semaphore:
             try:
                 async with httpx.AsyncClient() as client:
-                    raw = await self._get(client, f"/profile/{ticker}")
+                    raw = await self._get(client, "/profile", symbol=ticker)
                     if not raw or not isinstance(raw, list) or not raw[0].get("companyName"):
                         self._circuit.record_failure()
                         return self.error_response(f"No profile for {ticker}")
@@ -191,7 +189,7 @@ class FMPAdapter(IMarketDataAdapter):
                     identity = CompanyIdentity(
                         isin=entry.get("isin"),
                         name=entry["companyName"],
-                        exchange=entry.get("exchangeShortName"),
+                        exchange=entry.get("exchange"),
                         currency=entry.get("currency"),
                     )
                     self._circuit.record_success()
