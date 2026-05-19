@@ -9,9 +9,12 @@
 .env
 __pycache__
 .venv
+.pytest_cache
+.ruff_cache
 
 # Backend
 /backend/LLM-prompts/
+/backend/scripts/
 /backend/visualization-scripts/donut_frames
 /backend/sec-csa-downloader/companies
 /backend/ws-statement-parser/ws-statements
