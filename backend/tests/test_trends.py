@@ -16,19 +16,19 @@ MOCK_TRENDS_DATA = {
 
 
 def test_trends_requires_commodities():
-    response = client.get("/api/trends")
+    response = client.get("/api/v1/trends")
 
     assert response.status_code == 422
 
 
 def test_trends_rejects_unknown_commodity():
-    response = client.get("/api/trends?commodities=Unobtanium")
+    response = client.get("/api/v1/trends?commodities=Unobtanium")
 
     assert response.status_code == 400
 
 
 def test_trends_rejects_unknown_timeframe():
-    response = client.get("/api/trends?commodities=Gold&timeframe=Invalid")
+    response = client.get("/api/v1/trends?commodities=Gold&timeframe=Invalid")
 
     assert response.status_code == 400
 
@@ -40,7 +40,7 @@ def test_trends_returns_cached_result():
         ) as mock_cache,
         patch("routers.trends.fetch_trends_data") as mock_fetch,
     ):
-        response = client.get("/api/trends?commodities=Gold&commodities=Silver")
+        response = client.get("/api/v1/trends?commodities=Gold&commodities=Silver")
 
     assert response.status_code == 200
     assert response.json() == MOCK_TRENDS_DATA
@@ -56,7 +56,7 @@ def test_trends_fetches_and_caches_on_miss():
         ) as mock_fetch,
         patch("routers.trends.upsert_trends_cache") as mock_upsert,
     ):
-        response = client.get("/api/trends?commodities=Gold&commodities=Silver")
+        response = client.get("/api/v1/trends?commodities=Gold&commodities=Silver")
 
     assert response.status_code == 200
     assert response.json() == MOCK_TRENDS_DATA
@@ -72,6 +72,6 @@ def test_trends_raises_502_on_fetch_error():
             side_effect=Exception("Google rate limit"),
         ),
     ):
-        response = client.get("/api/trends?commodities=Gold")
+        response = client.get("/api/v1/trends?commodities=Gold")
 
     assert response.status_code == 502

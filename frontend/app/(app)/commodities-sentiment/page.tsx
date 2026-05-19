@@ -92,7 +92,7 @@ export default function CommoditiesSentimentPage() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/trends?${params}`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/trends?${params}`,
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

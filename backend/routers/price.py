@@ -4,10 +4,10 @@ from fastapi import APIRouter, HTTPException, Path
 
 from services.price import get_current_price, get_price_history
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1")
 
 
-@router.get("/api/price/{ticker}")
+@router.get("/price/{ticker}")
 def current_price(ticker: str = Path(..., min_length=1)) -> dict:
     try:
         return get_current_price(ticker.upper())
@@ -17,7 +17,7 @@ def current_price(ticker: str = Path(..., min_length=1)) -> dict:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-@router.get("/api/price/{ticker}/history")
+@router.get("/price/{ticker}/history")
 def price_history(ticker: str = Path(..., min_length=1)) -> dict:
     try:
         return get_price_history(ticker.upper())

@@ -29,7 +29,7 @@ export default function CsvDropzone({
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/investments/upload`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/investments/upload`,
         {
           method: "POST",
           headers: { "X-User-Id": userId },

@@ -23,7 +23,7 @@ def mock_sec_tickers():
 
 
 def test_search_returns_results():
-    response = client.get("/api/search?q=AAPL")
+    response = client.get("/api/v1/search?q=AAPL")
 
     assert response.status_code == 200
     results = response.json()
@@ -32,7 +32,7 @@ def test_search_returns_results():
 
 
 def test_search_exact_ticker_ranked_first():
-    response = client.get("/api/search?q=AU")
+    response = client.get("/api/v1/search?q=AU")
 
     assert response.status_code == 200
     results = response.json()
@@ -40,7 +40,7 @@ def test_search_exact_ticker_ranked_first():
 
 
 def test_search_by_name():
-    response = client.get("/api/search?q=nano")
+    response = client.get("/api/v1/search?q=nano")
 
     assert response.status_code == 200
     results = response.json()
@@ -49,14 +49,14 @@ def test_search_by_name():
 
 
 def test_search_returns_at_most_ten_results():
-    response = client.get("/api/search?q=A")
+    response = client.get("/api/v1/search?q=A")
 
     assert response.status_code == 200
     assert len(response.json()) <= 10
 
 
 def test_search_result_shape():
-    response = client.get("/api/search?q=AAPL")
+    response = client.get("/api/v1/search?q=AAPL")
 
     assert response.status_code == 200
     result = response.json()[0]
@@ -66,6 +66,6 @@ def test_search_result_shape():
 
 
 def test_search_missing_query_returns_422():
-    response = client.get("/api/search")
+    response = client.get("/api/v1/search")
 
     assert response.status_code == 422

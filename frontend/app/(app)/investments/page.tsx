@@ -90,10 +90,10 @@ export default function InvestmentsPage() {
       const headers = { "X-User-Id": userId };
 
       const [posRes, txnRes, prefRes, holdingsRes] = await Promise.all([
-        fetch(`${base}/api/investments/positions`, { headers }),
-        fetch(`${base}/api/investments/transactions`, { headers }),
-        fetch(`${base}/api/investments/preferences`, { headers }),
-        fetch(`${base}/api/investments/holdings`, { headers }),
+        fetch(`${base}/api/v1/investments/positions`, { headers }),
+        fetch(`${base}/api/v1/investments/transactions`, { headers }),
+        fetch(`${base}/api/v1/investments/preferences`, { headers }),
+        fetch(`${base}/api/v1/investments/holdings`, { headers }),
       ]);
 
       if (!posRes.ok || !txnRes.ok) {
@@ -139,7 +139,7 @@ export default function InvestmentsPage() {
 
       if (nonCryptoTickers.length > 0) {
         const metaRes = await fetch(
-          `${base}/api/investments/metadata?tickers=${nonCryptoTickers.join(",")}`,
+          `${base}/api/v1/investments/metadata?tickers=${nonCryptoTickers.join(",")}`,
         );
         if (metaRes.ok) {
           const metaData: Record<string, SymbolMetadata> = await metaRes.json();
@@ -172,7 +172,7 @@ export default function InvestmentsPage() {
     if (!userId || !base) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
-      fetch(`${base}/api/investments/preferences`, {
+      fetch(`${base}/api/v1/investments/preferences`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "X-User-Id": userId },
         body: JSON.stringify({
