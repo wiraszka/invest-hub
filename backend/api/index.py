@@ -37,7 +37,7 @@ async def correlation_id_middleware(request: Request, call_next):
         response = await call_next(request)
         response.headers["X-Request-Id"] = request_id
         return response
-    except Exception as exc:
+    except Exception:
         logger.exception("Unhandled error", extra={"path": request.url.path})
         return JSONResponse(
             status_code=500,

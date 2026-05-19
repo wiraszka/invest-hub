@@ -22,7 +22,6 @@ from models.market_data import (
     Quote,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
