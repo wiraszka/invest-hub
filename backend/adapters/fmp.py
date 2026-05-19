@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import httpx
 
@@ -20,6 +21,7 @@ from models.market_data import (
 )
 
 _BASE = "https://financialmodelingprep.com/stable"
+logger = logging.getLogger(__name__)
 
 
 class FMPAdapter(IMarketDataAdapter):
@@ -61,6 +63,7 @@ class FMPAdapter(IMarketDataAdapter):
                     raw = await self._get(client, "/quote", symbol=ticker)
                     if not raw or not isinstance(raw, list) or not raw[0].get("price"):
                         self._circuit.record_failure()
+                        logger.warning("fmp quote empty", extra={"ticker": ticker})
                         return self.error_response(f"No quote data for {ticker}")
 
                     entry = raw[0]
@@ -75,6 +78,7 @@ class FMPAdapter(IMarketDataAdapter):
                     return ProviderResponse(data=quote, raw=entry, provider=self.name, fetched_at=self.now())
             except Exception as exc:
                 self._circuit.record_failure()
+                logger.exception("fmp get_quote error", extra={"ticker": ticker})
                 return self.error_response(str(exc))
 
     async def get_financials(self, ticker: str) -> ProviderResponse[Financials]:
