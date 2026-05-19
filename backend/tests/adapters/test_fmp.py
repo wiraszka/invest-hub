@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from adapters.fmp import FMPAdapter
-from models.market_data import Financials, Quote
+from models.market_data import CompanyIdentity, Financials, Quote
 
 
 @pytest.fixture
@@ -46,6 +46,34 @@ class TestGetQuote:
         assert response.data is None
         assert response.error is not None
 
+    async def test_returns_error_on_missing_price_field(self, adapter: FMPAdapter) -> None:
+        raw_payload = [{"symbol": "AAPL", "volume": 12345}]
+
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
+            with patch("adapters.fmp.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_quote("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
+
+    async def test_returns_error_on_exception(self, adapter: FMPAdapter) -> None:
+        with patch.object(adapter, "_get", new=AsyncMock(side_effect=RuntimeError("network error"))):
+            with patch("adapters.fmp.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_quote("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
+
     async def test_circuit_opens_after_threshold_failures(self, adapter: FMPAdapter) -> None:
         with patch.object(adapter, "_get", new=AsyncMock(return_value=None)):
             with patch("adapters.fmp.httpx.AsyncClient") as mock_client_cls:
@@ -58,6 +86,16 @@ class TestGetQuote:
                     await adapter.get_quote("FAIL")
 
         assert adapter._circuit.is_open
+
+    async def test_returns_error_when_circuit_is_open(self, adapter: FMPAdapter) -> None:
+        import time
+        adapter._circuit._failures = adapter._circuit.failure_threshold
+        adapter._circuit._opened_at = time.monotonic()
+
+        response = await adapter.get_quote("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
 
 
 class TestGetFinancials:
@@ -102,3 +140,89 @@ class TestGetFinancials:
         assert len(response.data.income) == 1
         assert response.data.income[0].revenue == 100_000_000
         assert response.data.income[0].period == "FY2024"
+
+    async def test_returns_error_on_empty_income(self, adapter: FMPAdapter) -> None:
+        async def mock_get(client, path: str, **params):
+            return []
+
+        with patch.object(adapter, "_get", new=mock_get):
+            with patch("adapters.fmp.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_financials("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
+
+    async def test_returns_error_on_none_response(self, adapter: FMPAdapter) -> None:
+        async def mock_get(client, path: str, **params):
+            return None
+
+        with patch.object(adapter, "_get", new=mock_get):
+            with patch("adapters.fmp.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_financials("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
+
+
+class TestGetProfile:
+    async def test_returns_profile_on_success(self, adapter: FMPAdapter) -> None:
+        raw_payload = [{
+            "symbol": "AAPL",
+            "companyName": "Apple Inc.",
+            "exchange": "NASDAQ",
+            "currency": "USD",
+            "isin": "US0378331005",
+        }]
+
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
+            with patch("adapters.fmp.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_profile("AAPL")
+
+        assert response.data is not None
+        assert isinstance(response.data, CompanyIdentity)
+        assert response.data.name == "Apple Inc."
+        assert response.data.exchange == "NASDAQ"
+        assert response.error is None
+
+    async def test_returns_error_on_empty_profile(self, adapter: FMPAdapter) -> None:
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=None)):
+            with patch("adapters.fmp.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_profile("UNKNOWN")
+
+        assert response.data is None
+        assert response.error is not None
+
+    async def test_returns_error_on_missing_name_field(self, adapter: FMPAdapter) -> None:
+        raw_payload = [{"symbol": "AAPL", "exchange": "NASDAQ"}]
+
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
+            with patch("adapters.fmp.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_profile("AAPL")
+
+        assert response.data is None
+        assert response.error is not None

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from adapters.finnhub import FinnhubAdapter
-from models.market_data import Quote
+from models.market_data import CompanyIdentity, Quote
 
 
 @pytest.fixture
@@ -30,6 +30,7 @@ class TestGetQuote:
         assert isinstance(response.data, Quote)
         assert response.data.price == 185.5
         assert response.provider == "finnhub"
+        assert response.error is None
 
     async def test_returns_error_when_price_is_zero(self, adapter: FinnhubAdapter) -> None:
         raw_payload = {"c": 0, "h": 0, "l": 0}
@@ -46,6 +47,42 @@ class TestGetQuote:
         assert response.data is None
         assert response.error is not None
 
+    async def test_returns_error_on_none_response(self, adapter: FinnhubAdapter) -> None:
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=None)):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_quote("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
+
+    async def test_returns_error_on_exception(self, adapter: FinnhubAdapter) -> None:
+        with patch.object(adapter, "_get", new=AsyncMock(side_effect=RuntimeError("timeout"))):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_quote("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
+
+    async def test_returns_error_when_circuit_is_open(self, adapter: FinnhubAdapter) -> None:
+        import time
+        adapter._circuit._failures = adapter._circuit.failure_threshold
+        adapter._circuit._opened_at = time.monotonic()
+
+        response = await adapter.get_quote("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
+
 
 class TestGetFinancials:
     async def test_always_returns_error(self, adapter: FinnhubAdapter) -> None:
@@ -53,3 +90,56 @@ class TestGetFinancials:
 
         assert response.data is None
         assert "free tier" in (response.error or "").lower()
+
+
+class TestGetProfile:
+    async def test_returns_profile_on_success(self, adapter: FinnhubAdapter) -> None:
+        raw_payload = {
+            "name": "Apple Inc.",
+            "ticker": "AAPL",
+            "exchange": "NASDAQ",
+            "currency": "USD",
+            "isin": "US0378331005",
+        }
+
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_profile("AAPL")
+
+        assert response.data is not None
+        assert isinstance(response.data, CompanyIdentity)
+        assert response.data.name == "Apple Inc."
+        assert response.error is None
+
+    async def test_returns_error_on_missing_name(self, adapter: FinnhubAdapter) -> None:
+        raw_payload = {"ticker": "AAPL", "exchange": "NASDAQ"}
+
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_profile("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
+
+    async def test_returns_error_on_none_response(self, adapter: FinnhubAdapter) -> None:
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=None)):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_profile("AAPL")
+
+        assert response.data is None
+        assert response.error is not None
