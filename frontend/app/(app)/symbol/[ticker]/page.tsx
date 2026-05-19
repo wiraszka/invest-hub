@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import PriceSection from "@/components/company/PriceSection";
-import ResearchPanel from "@/components/company/ResearchPanel";
+import PriceSection from "@/components/symbol/PriceSection";
+import ResearchPanel from "@/components/symbol/ResearchPanel";
 
-export default function CompanyPage() {
+export default function SymbolPage() {
   const { ticker } = useParams<{ ticker: string }>();
 
   return (
