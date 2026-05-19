@@ -46,7 +46,7 @@ export default function UploadManager({ userId, onUpload }: Props) {
 
   async function fetchSources() {
     try {
-      const res = await fetch(`${base}/api/investments/sources`, {
+      const res = await fetch(`${base}/api/v1/investments/sources`, {
         headers: { "X-User-Id": userId },
       });
       if (res.ok) setSources(await res.json());
@@ -69,7 +69,7 @@ export default function UploadManager({ userId, onUpload }: Props) {
     form.append("file", file);
 
     try {
-      const res = await fetch(`${base}/api/investments/upload`, {
+      const res = await fetch(`${base}/api/v1/investments/upload`, {
         method: "POST",
         headers: { "X-User-Id": userId },
         body: form,
@@ -92,7 +92,7 @@ export default function UploadManager({ userId, onUpload }: Props) {
   async function handleClear(source: string | null) {
     const sourceKey = source ?? "legacy";
     try {
-      await fetch(`${base}/api/investments/sources/${sourceKey}`, {
+      await fetch(`${base}/api/v1/investments/sources/${sourceKey}`, {
         method: "DELETE",
         headers: { "X-User-Id": userId },
       });

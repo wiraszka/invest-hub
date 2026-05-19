@@ -42,7 +42,7 @@ export default function PriceSection({ ticker }: Props) {
     const base = process.env.NEXT_PUBLIC_BACKEND_URL;
 
     Promise.all([
-      fetch(`${base}/api/price/${ticker}`).then((r) => r.json()),
+      fetch(`${base}/api/v1/price/${ticker}`).then((r) => r.json()),
       fetch(`${base}/api/price/${ticker}/history`).then((r) => r.json()),
     ])
       .then(([priceData, historyData]) => {

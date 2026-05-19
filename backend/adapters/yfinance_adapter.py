@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import math
 from functools import partial
 
 import yfinance as yf
@@ -19,6 +21,8 @@ from models.market_data import (
     ProviderResponse,
     Quote,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class YFinanceAdapter(IMarketDataAdapter):
@@ -192,7 +196,6 @@ def _safe_float(df, row: str, col) -> float | None:
         value = df.loc[row, col]
         if value is None:
             return None
-        import math
         return None if math.isnan(float(value)) else float(value)
     except (KeyError, TypeError, ValueError):
         return None

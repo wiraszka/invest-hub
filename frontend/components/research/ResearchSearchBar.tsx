@@ -31,7 +31,7 @@ export default function ResearchSearchBar({ onSelect }: Props) {
       setLoading(true);
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/search?q=${encodeURIComponent(trimmed)}`,
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/search?q=${encodeURIComponent(trimmed)}`,
         );
         if (res.ok) {
           const data: SearchResult[] = await res.json();

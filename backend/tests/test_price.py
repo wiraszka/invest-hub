@@ -20,7 +20,7 @@ MOCK_HISTORY = {
 
 def test_current_price_returns_ticker_and_price():
     with patch("routers.price.get_current_price", return_value=MOCK_PRICE):
-        response = client.get("/api/price/NNE")
+        response = client.get("/api/v1/price/NNE")
 
     assert response.status_code == 200
     data = response.json()
@@ -30,21 +30,21 @@ def test_current_price_returns_ticker_and_price():
 
 def test_current_price_uppercases_ticker():
     with patch("routers.price.get_current_price", return_value=MOCK_PRICE) as mock:
-        client.get("/api/price/nne")
+        client.get("/api/v1/price/nne")
 
     mock.assert_called_once_with("NNE")
 
 
 def test_current_price_returns_404_on_invalid_ticker():
     with patch("routers.price.get_current_price", side_effect=ValueError("Not found")):
-        response = client.get("/api/price/INVALID")
+        response = client.get("/api/v1/price/INVALID")
 
     assert response.status_code == 404
 
 
 def test_price_history_returns_ticker_and_history():
     with patch("routers.price.get_price_history", return_value=MOCK_HISTORY):
-        response = client.get("/api/price/NNE/history")
+        response = client.get("/api/v1/price/NNE/history")
 
     assert response.status_code == 200
     data = response.json()
@@ -55,7 +55,7 @@ def test_price_history_returns_ticker_and_history():
 
 def test_price_history_returns_404_on_invalid_ticker():
     with patch("routers.price.get_price_history", side_effect=ValueError("Not found")):
-        response = client.get("/api/price/INVALID/history")
+        response = client.get("/api/v1/price/INVALID/history")
 
     assert response.status_code == 404
 

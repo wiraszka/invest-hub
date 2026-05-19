@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import httpx
 
@@ -11,6 +12,7 @@ from core.exceptions import CircuitOpenError
 from models.market_data import CompanyIdentity, Financials, ProviderResponse, Quote
 
 _BASE = "https://finnhub.io/api/v1"
+logger = logging.getLogger(__name__)
 
 
 class FinnhubAdapter(IMarketDataAdapter):
@@ -53,6 +55,7 @@ class FinnhubAdapter(IMarketDataAdapter):
                     # Finnhub returns {"c": current, "h": high, "l": low, ...}; c=0 means no data
                     if not raw or not raw.get("c"):
                         self._circuit.record_failure()
+                        logger.warning("finnhub quote empty", extra={"ticker": ticker})
                         return self.error_response(f"No quote data for {ticker}")
 
                     quote = Quote(

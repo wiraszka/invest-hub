@@ -4,10 +4,10 @@ from fastapi import APIRouter, HTTPException, Query
 
 from services.search import search_companies
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1")
 
 
-@router.get("/api/search")
+@router.get("/search")
 def search(q: str = Query(..., min_length=1)) -> list[dict]:
     try:
         return search_companies(q, limit=10)
