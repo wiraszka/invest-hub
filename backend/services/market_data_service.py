@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +18,8 @@ from db.pg_models import (
 from models.market_data import CompanyIdentity, Financials, Quote
 from services.identity import resolve_identity
 from services.provider_registry import ProviderRegistry
+
+logger = logging.getLogger(__name__)
 
 
 class MarketDataService:
@@ -61,6 +65,7 @@ class MarketDataService:
             response = await adapter.get_quote(ticker)
             attempted.append(adapter.name)
             if response.data is None:
+                logger.warning("adapter quote miss", extra={"ticker": ticker, "provider": adapter.name})
                 continue
 
             quote = response.data
@@ -68,9 +73,11 @@ class MarketDataService:
                 quote.canonical_id = identity.canonical_id
                 await self._persist_quote(quote, response.raw, adapter.name, session)
 
+            logger.info("quote fetched", extra={"ticker": ticker, "provider": adapter.name, "price": quote.price})
             cache.set(cache_key, quote, settings.quote_ttl_seconds)
             return quote
 
+        logger.error("all quote providers exhausted", extra={"ticker": ticker, "attempted": attempted})
         raise ProviderUnavailableError(ticker, attempted)
 
     async def get_financials(
@@ -111,6 +118,7 @@ class MarketDataService:
             response = await adapter.get_financials(ticker)
             attempted.append(adapter.name)
             if response.data is None:
+                logger.warning("adapter financials miss", extra={"ticker": ticker, "provider": adapter.name})
                 continue
 
             financials = response.data
@@ -118,9 +126,11 @@ class MarketDataService:
                 financials.canonical_id = identity.canonical_id
                 await self._persist_financials(financials, response.raw, ticker, adapter.name, session)
 
+            logger.info("financials fetched", extra={"ticker": ticker, "provider": adapter.name})
             cache.set(cache_key, financials, settings.financials_ttl_seconds)
             return financials
 
+        logger.error("all financials providers exhausted", extra={"ticker": ticker, "attempted": attempted})
         raise ProviderUnavailableError(ticker, attempted)
 
     async def get_profile(
@@ -236,14 +246,14 @@ class MarketDataService:
                 })
 
             if financials.metrics and financials.metrics.period == income.period:
-                m = financials.metrics
+                metrics = financials.metrics
                 values.update({
-                    "market_cap": m.market_cap,
-                    "enterprise_value": m.enterprise_value,
-                    "pe_ratio": m.pe_ratio,
-                    "ev_ebitda": m.ev_ebitda,
-                    "price_to_book": m.price_to_book,
-                    "roe": m.roe,
+                    "market_cap": metrics.market_cap,
+                    "enterprise_value": metrics.enterprise_value,
+                    "pe_ratio": metrics.pe_ratio,
+                    "ev_ebitda": metrics.ev_ebitda,
+                    "price_to_book": metrics.price_to_book,
+                    "roe": metrics.roe,
                 })
 
             await session.execute(
