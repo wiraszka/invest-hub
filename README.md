@@ -1,14 +1,14 @@
 # invest-hub
 
-A personal investment tracking and stock research platform built on a FastAPI backend and Next.js frontend, deployed on Vercel.
+Personal investment tracking and stock research platform. Upload brokerage transaction history to track positions and portfolio composition, view live prices, and monitor commodity sentiment trends. Built on FastAPI + Next.js, deployed on Vercel.
 
 ## Features
 
-- **Investments** — Upload Wealthsimple or Questrade transaction history to track open positions, cost basis, realized P/L, and portfolio composition via interactive charts. No external API calls — works entirely from your uploaded data.
+- **Investments** — Upload Wealthsimple or Questrade transaction history; track open positions, cost basis, realized P/L, and portfolio composition via donut charts. No external API calls — works entirely from uploaded data.
 - **Symbol page** — Live price chart for any ticker (TwelveData → FMP fallback)
-- **Research** — Search any SEC-registered ticker; AI-powered analysis pipeline in active redesign
-- **Commodities Sentiment** — Google Trends interest tracker for 11 commodities with a live line chart and momentum indicators
-- **Shortlist** — Save tickers for quick re-access (placeholder)
+- **Research** — Search any SEC-registered ticker; AI analysis pipeline in active redesign
+- **Commodities Sentiment** — Google Trends interest for 11 commodities with momentum indicators and a line chart
+- **Shortlist** — Placeholder
 
 ## Tech Stack
 
@@ -16,31 +16,11 @@ A personal investment tracking and stock research platform built on a FastAPI ba
 |---|---|
 | Frontend | Next.js (React), Recharts, Tailwind CSS |
 | Backend | FastAPI (Python), Vercel serverless functions |
-| Database | PostgreSQL (Neon) — all app and market data |
+| Database | PostgreSQL (Neon) |
 | Auth | Clerk |
-| LLM | Claude API (Anthropic) — pending Research redesign |
-| Price Data | TwelveData API (FMP fallback) |
-| Financial Data | FMP stable API, SEC EDGAR XBRL |
-| Filing Data | SEC EDGAR API |
-| Sentiment Data | Google Trends (pytrends) |
-| Market Data | Finnhub API, yfinance |
-| Identity Resolution | OpenFIGI API |
+| Data providers | TwelveData, FMP, Finnhub, yfinance, SEC EDGAR, Google Trends, OpenFIGI |
 
-## Project Structure
-
-```
-invest-hub/
-├── frontend/           # Next.js app
-├── backend/            # FastAPI app
-│   ├── api/            # Entry point (index.py)
-│   ├── adapters/       # Market data provider adapters (hexagonal architecture)
-│   ├── core/           # Config, cache, circuit breaker, exceptions
-│   ├── db/             # SQLAlchemy ORM models + async session factory
-│   ├── models/         # Canonical domain models (Pydantic)
-│   ├── routers/        # Route handlers
-│   └── services/       # Business logic
-└── PROJECT_OUTLINE.md  # Full architecture and feature spec
-```
+See [PROJECT_OUTLINE.md](PROJECT_OUTLINE.md) for full architecture, database schema, and feature spec.
 
 ## Setup
 
@@ -48,10 +28,9 @@ invest-hub/
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env  # fill in API keys
+cp .env.example .env   # fill in API keys
 uvicorn api.index:app --reload
 ```
 
@@ -60,7 +39,7 @@ uvicorn api.index:app --reload
 ```bash
 cd frontend
 pnpm install
-cp .env.local.example .env.local  # fill in keys
+cp .env.local.example .env.local   # fill in keys
 pnpm dev
 ```
 
@@ -71,13 +50,13 @@ pnpm dev
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | Neon PostgreSQL pooled connection string |
-| `DATABASE_URL_UNPOOLED` | Neon PostgreSQL direct connection (used for migrations) |
-| `FMP_API_KEY` | Financial Modeling Prep API key |
-| `FINNHUB_API_KEY` | Finnhub API key |
-| `OPENFIGI_API_KEY` | OpenFIGI API key |
-| `TD_API_KEY` | TwelveData API key |
-| `ANTHROPIC_API_KEY` | Claude API key |
-| `SEC_CONTACT_EMAIL` | Contact email for SEC EDGAR User-Agent header |
+| `DATABASE_URL_UNPOOLED` | Neon PostgreSQL direct connection (used for Alembic migrations) |
+| `FMP_API_KEY` | Financial Modeling Prep |
+| `FINNHUB_API_KEY` | Finnhub |
+| `OPENFIGI_API_KEY` | OpenFIGI |
+| `TD_API_KEY` | TwelveData |
+| `ANTHROPIC_API_KEY` | Claude API |
+| `SEC_CONTACT_EMAIL` | Contact email for SEC EDGAR `User-Agent` header |
 
 ### Frontend (`frontend/.env.local`)
 
@@ -87,6 +66,17 @@ pnpm dev
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk frontend publishable key |
 | `CLERK_SECRET_KEY` | Clerk backend secret key |
 
-## Documentation
+## Database Migrations
 
-See [PROJECT_OUTLINE.md](PROJECT_OUTLINE.md) for full architecture, database schema, and feature spec.
+Schema is managed by Alembic. On first run against an existing Neon DB (schema was applied manually before migrations were added):
+
+```bash
+cd backend
+alembic stamp 0001
+```
+
+On a fresh database:
+
+```bash
+alembic upgrade head
+```

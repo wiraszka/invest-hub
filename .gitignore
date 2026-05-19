@@ -28,5 +28,6 @@ __pycache__
 
 # Project docs
 PROJECT_OUTLINE.md
+AGENTS.md
 .vercel
 .env*.local
