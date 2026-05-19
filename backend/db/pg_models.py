@@ -6,7 +6,9 @@ from sqlalchemy import (
     ARRAY,
     TIMESTAMP,
     Column,
+    Date,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     Text,
@@ -21,6 +23,11 @@ class Base(DeclarativeBase):
     pass
 
 
+# ---------------------------------------------------------------------------
+# Market data layer
+# ---------------------------------------------------------------------------
+
+
 class Company(Base):
     __tablename__ = "companies"
 
@@ -30,6 +37,9 @@ class Company(Base):
     name = Column(Text, nullable=False)
     exchange = Column(Text, nullable=True)
     currency = Column(Text, nullable=True)
+    sector = Column(Text, nullable=True)
+    country = Column(Text, nullable=True)
+    asset_type = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -111,3 +121,68 @@ class NormalizedFinancials(Base):
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     __table_args__ = (UniqueConstraint("canonical_id", "period"),)
+
+
+# ---------------------------------------------------------------------------
+# App layer — investments + user data
+# ---------------------------------------------------------------------------
+
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Text, nullable=False)
+    source = Column(Text, nullable=True)
+    account_type = Column(Text, nullable=True)
+    symbol = Column(Text, nullable=True)
+    raw_symbol = Column(Text, nullable=True)
+    name = Column(Text, nullable=True)
+    activity_type = Column(Text, nullable=True)
+    activity_sub_type = Column(Text, nullable=True)
+    transaction_date = Column(Date, nullable=True)
+    quantity = Column(Numeric, nullable=True)
+    unit_price = Column(Numeric, nullable=True)
+    commission = Column(Numeric, nullable=True)
+    net_cash_amount = Column(Numeric, nullable=True)
+    currency = Column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_transactions_user_source", "user_id", "source"),)
+
+
+class Holding(Base):
+    __tablename__ = "holdings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Text, nullable=False)
+    source = Column(Text, nullable=True)
+    symbol = Column(Text, nullable=True)
+    name = Column(Text, nullable=True)
+    quantity = Column(Numeric, nullable=True)
+    currency = Column(Text, nullable=True)
+    raw_data = Column(JSONB, nullable=False)
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (Index("ix_holdings_user_id", "user_id"),)
+
+
+class UserPreferences(Base):
+    __tablename__ = "user_preferences"
+
+    user_id = Column(Text, primary_key=True)
+    grouping_labels = Column(JSONB, nullable=True)
+    grouping_assignments = Column(JSONB, nullable=True)
+    sector_overrides = Column(JSONB, nullable=True)
+    industry_overrides = Column(JSONB, nullable=True)
+    visible_columns = Column(JSONB, nullable=True)
+    middle_chart_column = Column(Text, nullable=True)
+    chart_value_mode = Column(Text, nullable=True)
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class TrendsCache(Base):
+    __tablename__ = "trends_cache"
+
+    cache_key = Column(Text, primary_key=True)
+    data = Column(JSONB, nullable=False)
+    fetched_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)

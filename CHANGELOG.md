@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.18.0] - 2026-05-18
+
+### Changed
+
+- Migrate investments, holdings, user preferences, and trends cache from MongoDB to PostgreSQL — MongoDB dependency and all related service code fully removed
+- Remove API calls from the Investments page — sector metadata and analysis endpoints dropped; the page now works entirely from user-uploaded data
+- Stub out the Research analysis pipeline (`POST/GET /api/analysis/{ticker}` returns 501) pending a full redesign
+- Rename the symbol detail page from `/company/[ticker]` to `/symbol/[ticker]` throughout the app — not all tickers represent companies
+
 ## [v1.17.0] - 2026-05-19
 
 ### Fixed

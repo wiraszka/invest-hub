@@ -31,7 +31,6 @@ class Settings(BaseSettings):
     finnhub_api_key: str = ""
     openfigi_api_key: str = ""
     database_url: str = ""
-    mongodb_uri: str = ""
     td_api_key: str = ""
     anthropic_api_key: str = ""
     sec_contact_email: str = ""

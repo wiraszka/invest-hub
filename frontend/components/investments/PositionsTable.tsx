@@ -371,7 +371,7 @@ export default function PositionsTable({
                   <td className="w-48 max-w-48 px-4 py-3 text-neutral-400">
                     {isLink ? (
                       <Link
-                        href={`/company/${cticker}`}
+                        href={`/symbol/${cticker}`}
                         className="truncate text-blue-400 hover:text-blue-300 hover:underline"
                       >
                         {p.name || p.symbol}
