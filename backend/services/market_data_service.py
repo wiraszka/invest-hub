@@ -16,12 +16,12 @@ from db.pg_models import (
     RawQuote,
 )
 from models.market_data import CompanyIdentity, Financials, Quote
+from services.identity import resolve_identity
+from services.provider_registry import ProviderRegistry
 
 
 def _financials_sufficient(data: Financials) -> bool:
     return bool(data.income or data.balance_sheet or data.cash_flow)
-from services.identity import resolve_identity
-from services.provider_registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 

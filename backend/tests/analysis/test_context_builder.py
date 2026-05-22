@@ -201,7 +201,7 @@ class TestMetricsBlock:
         financials = _make_financials()
         quote = _make_quote()
 
-        context = StructuredContext(
+        _context = StructuredContext(
             ticker="AAPL",
             company_name="Apple Inc.",
             exchange="NASDAQ",
