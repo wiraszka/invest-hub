@@ -117,6 +117,7 @@ interface Props {
   analysisStatus?: Record<string, AnalysisStatus>;
   analyzedTickers?: Set<string>;
   symbolMetadata?: Record<string, SymbolMetadata>;
+  resolvedCanonicals?: Record<string, string>;
   groupingLabels?: string[];
   groupingAssignments?: Record<string, string>;
   sectorOverrides?: Record<string, string>;
@@ -178,11 +179,21 @@ function effectiveSector(
   return meta.sector ?? "";
 }
 
+function effectiveIndustry(
+  meta: SymbolMetadata | undefined,
+  override: string | undefined,
+): string {
+  if (override !== undefined) return override;
+  if (!meta) return "";
+  return meta.industry ?? "";
+}
+
 export default function PositionsTable({
   positions,
   analysisStatus = {},
   analyzedTickers = new Set(),
   symbolMetadata = {},
+  resolvedCanonicals = {},
   groupingLabels = [],
   groupingAssignments = {},
   sectorOverrides = {},
@@ -339,7 +350,10 @@ export default function PositionsTable({
         </thead>
         <tbody>
           {sorted.map((p, i) => {
-            const cticker = canonicalTicker(p.symbol, p.currency);
+            const cticker =
+              resolvedCanonicals[p.symbol] ??
+              canonicalTicker(p.symbol, p.exchange) ??
+              p.symbol;
             const posKey = `${p.account}::${p.symbol}`;
             const isLink = analyzedTickers.has(cticker);
             const status = analysisStatus[cticker] ?? "idle";
@@ -421,7 +435,10 @@ export default function PositionsTable({
                   <td className="w-32 px-4 py-2">
                     <input
                       type="text"
-                      value={industryOverrides[posKey] ?? ""}
+                      value={effectiveIndustry(
+                        symbolMetadata[cticker],
+                        industryOverrides[posKey],
+                      )}
                       onChange={(e) =>
                         onIndustryChange?.(posKey, e.target.value)
                       }

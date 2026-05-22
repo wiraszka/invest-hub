@@ -8,6 +8,7 @@ export interface SymbolMetadata {
   fmp_ticker?: string;
   asset_type: string;
   sector: string | null;
+  industry: string | null;
   country: string | null;
   sector_weights: { sector: string; weight: number }[] | null;
   country_weights: { country: string; weight: number }[] | null;
@@ -15,13 +16,18 @@ export interface SymbolMetadata {
   fetched_at: string;
 }
 
-export function canonicalTicker(symbol: string, currency: string): string {
-  return currency === "CAD" ? `${symbol}.TO` : symbol;
+export function canonicalTicker(symbol: string, exchange?: string): string {
+  if (!exchange) return symbol;
+  const exch = exchange.toUpperCase();
+  if (exch === "TSX") return `${symbol}.TO`;
+  if (exch === "TSXV" || exch === "TSX-V" || exch === "TSX VENTURE") return `${symbol}.V`;
+  return symbol;
 }
 
 interface Props {
   positions: Position[];
   symbolMetadata: Record<string, SymbolMetadata>;
+  resolvedCanonicals: Record<string, string>;
   metadataReady: boolean;
   groupingAssignments: Record<string, string>;
   sectorOverrides: Record<string, string>;
@@ -67,6 +73,7 @@ function computeAssetType(
 function computeSector(
   positions: Position[],
   metadata: Record<string, SymbolMetadata>,
+  resolvedCanonicals: Record<string, string>,
   sectorOverrides: Record<string, string>,
   mode: "cost_basis" | "market_value",
 ) {
@@ -83,7 +90,8 @@ function computeSector(
       accumulate(buckets, override, val);
       continue;
     }
-    const meta = metadata[canonicalTicker(p.symbol, p.currency)];
+    const cticker = resolvedCanonicals[p.symbol] ?? p.symbol;
+    const meta = metadata[cticker];
     if (!meta) continue;
     if (meta.sector_weights) {
       for (const sw of meta.sector_weights) {
@@ -100,6 +108,8 @@ function computeSector(
 
 function computeIndustry(
   positions: Position[],
+  metadata: Record<string, SymbolMetadata>,
+  resolvedCanonicals: Record<string, string>,
   industryOverrides: Record<string, string>,
   mode: "cost_basis" | "market_value",
 ) {
@@ -109,6 +119,12 @@ function computeIndustry(
     const override = industryOverrides[key]?.trim();
     if (override) {
       accumulate(buckets, override, posValue(p, mode));
+      continue;
+    }
+    const cticker = resolvedCanonicals[p.symbol] ?? p.symbol;
+    const meta = metadata[cticker];
+    if (meta?.industry) {
+      accumulate(buckets, meta.industry, posValue(p, mode));
     }
   }
   return toSlices(buckets);
@@ -134,6 +150,7 @@ const MIDDLE_OPTIONS = ["Sector", "Industry"];
 export default function ChartsSection({
   positions,
   symbolMetadata,
+  resolvedCanonicals,
   groupingAssignments,
   sectorOverrides,
   industryOverrides,
@@ -145,11 +162,14 @@ export default function ChartsSection({
   const sectorData = computeSector(
     positions,
     symbolMetadata,
+    resolvedCanonicals,
     sectorOverrides,
     chartValueMode,
   );
   const industryData = computeIndustry(
     positions,
+    symbolMetadata,
+    resolvedCanonicals,
     industryOverrides,
     chartValueMode,
   );
