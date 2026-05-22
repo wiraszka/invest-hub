@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-import os
 import re
 from datetime import date, timedelta
 
 import requests
 from bs4 import BeautifulSoup
 
-HEADERS = {
-    "User-Agent": f"invest-hub {os.environ.get('SEC_CONTACT_EMAIL', '')}",
-    "Accept-Encoding": "gzip, deflate",
-}
+from core.config import settings
+
 TIMEOUT = 30
+
+
+def _headers() -> dict:
+    return {
+        "User-Agent": f"invest-hub {settings.sec_contact_email}",
+        "Accept-Encoding": "gzip, deflate",
+    }
+
+
 TICKER_JSON_URL = "https://www.sec.gov/files/company_tickers.json"
 
 ANNUAL_FORM_TYPES = {"10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A"}
@@ -65,7 +71,7 @@ def _cik_str(cik: int | str) -> str:
 
 
 def resolve_cik(ticker: str) -> str:
-    resp = requests.get(TICKER_JSON_URL, headers=HEADERS, timeout=TIMEOUT)
+    resp = requests.get(TICKER_JSON_URL, headers=_headers(), timeout=TIMEOUT)
     resp.raise_for_status()
     ticker_upper = ticker.upper()
     for item in resp.json().values():
@@ -76,7 +82,7 @@ def resolve_cik(ticker: str) -> str:
 
 def get_submissions(cik_10: str) -> dict:
     url = f"https://data.sec.gov/submissions/CIK{cik_10}.json"
-    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+    resp = requests.get(url, headers=_headers(), timeout=TIMEOUT)
     resp.raise_for_status()
     return resp.json()
 
@@ -121,7 +127,7 @@ def fetch_filing_text(cik_10: str, accession: str, primary_doc: str) -> str:
         f"https://www.sec.gov/Archives/edgar/data/"
         f"{cik_no_zeros}/{accession_clean}/{primary_doc}"
     )
-    resp = requests.get(url, headers=HEADERS, timeout=60)
+    resp = requests.get(url, headers=_headers(), timeout=60)
     resp.raise_for_status()
     return _html_to_text(resp.text)
 
@@ -189,7 +195,7 @@ def get_xbrl_facts(cik_10: str, form_type: str) -> tuple[dict, str]:
     reporting_currency is the detected currency code (e.g. "USD", "CAD").
     """
     url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_10}.json"
-    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+    resp = requests.get(url, headers=_headers(), timeout=TIMEOUT)
     resp.raise_for_status()
     raw = resp.json()
 
