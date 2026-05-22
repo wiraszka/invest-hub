@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncGenerator
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -12,6 +11,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from core.config import settings
+
 # asyncpg rejects libpq-style query params — strip them and use connect_args for SSL
 _STRIP_PARAMS = {"sslmode", "channel_binding", "connect_timeout"}
 
@@ -19,7 +20,7 @@ _engine: AsyncEngine | None = None
 
 
 def _async_url() -> str:
-    url = os.environ.get("DATABASE_URL", "")
+    url = settings.database_url
     url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     parsed = urlparse(url)
     filtered = {k: v[0] for k, v in parse_qs(parsed.query).items() if k not in _STRIP_PARAMS}
