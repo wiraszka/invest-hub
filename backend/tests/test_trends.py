@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -36,9 +36,9 @@ def test_trends_rejects_unknown_timeframe():
 def test_trends_returns_cached_result():
     with (
         patch(
-            "routers.trends.get_trends_cache", return_value=MOCK_TRENDS_DATA
+            "routers.trends.get_trends_cache", new=AsyncMock(return_value=MOCK_TRENDS_DATA)
         ) as mock_cache,
-        patch("routers.trends.fetch_trends_data") as mock_fetch,
+        patch("routers.trends.fetch_trends_data", new=AsyncMock()) as mock_fetch,
     ):
         response = client.get("/api/v1/trends?commodities=Gold&commodities=Silver")
 
@@ -50,11 +50,11 @@ def test_trends_returns_cached_result():
 
 def test_trends_fetches_and_caches_on_miss():
     with (
-        patch("routers.trends.get_trends_cache", return_value=None),
+        patch("routers.trends.get_trends_cache", new=AsyncMock(return_value=None)),
         patch(
-            "routers.trends.fetch_trends_data", return_value=MOCK_TRENDS_DATA
+            "routers.trends.fetch_trends_data", new=AsyncMock(return_value=MOCK_TRENDS_DATA)
         ) as mock_fetch,
-        patch("routers.trends.upsert_trends_cache") as mock_upsert,
+        patch("routers.trends.upsert_trends_cache", new=AsyncMock()) as mock_upsert,
     ):
         response = client.get("/api/v1/trends?commodities=Gold&commodities=Silver")
 
@@ -66,10 +66,10 @@ def test_trends_fetches_and_caches_on_miss():
 
 def test_trends_raises_502_on_fetch_error():
     with (
-        patch("routers.trends.get_trends_cache", return_value=None),
+        patch("routers.trends.get_trends_cache", new=AsyncMock(return_value=None)),
         patch(
             "routers.trends.fetch_trends_data",
-            side_effect=Exception("Google rate limit"),
+            new=AsyncMock(side_effect=Exception("Google rate limit")),
         ),
     ):
         response = client.get("/api/v1/trends?commodities=Gold")

@@ -44,7 +44,7 @@ async def trends(
         return cached
 
     try:
-        result = fetch_trends_data(
+        result = await fetch_trends_data(
             commodities=commodities,
             keyword_map=COMMODITIES,
             timeframe_label=timeframe,

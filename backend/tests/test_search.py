@@ -7,18 +7,18 @@ from api.index import app
 
 client = TestClient(app)
 
-MOCK_TICKERS = {
-    "0": {"ticker": "AAPL", "title": "Apple Inc.", "cik_str": 320193},
-    "1": {"ticker": "AMZN", "title": "Amazon.com Inc.", "cik_str": 1018724},
-    "2": {"ticker": "AU", "title": "AngloGold Ashanti PLC", "cik_str": 1138118},
-    "3": {"ticker": "NNE", "title": "Nano Nuclear Energy Inc.", "cik_str": 1978313},
-    "4": {"ticker": "AAP", "title": "Advance Auto Parts Inc.", "cik_str": 1158449},
-}
+MOCK_SYMBOLS = [
+    {"ticker": "AAPL", "name": "Apple Inc.", "cik": 320193},
+    {"ticker": "AMZN", "name": "Amazon.com Inc.", "cik": 1018724},
+    {"ticker": "AU", "name": "AngloGold Ashanti PLC", "cik": 1138118},
+    {"ticker": "NNE", "name": "Nano Nuclear Energy Inc.", "cik": 1978313},
+    {"ticker": "AAP", "name": "Advance Auto Parts Inc.", "cik": 1158449},
+]
 
 
 @pytest.fixture(autouse=True)
-def mock_sec_tickers():
-    with patch("services.search._cache", MOCK_TICKERS):
+def mock_symbol_cache():
+    with patch("services.search._cache", MOCK_SYMBOLS):
         yield
 
 
