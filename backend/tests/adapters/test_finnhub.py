@@ -100,6 +100,9 @@ class TestGetProfile:
             "exchange": "NASDAQ",
             "currency": "USD",
             "isin": "US0378331005",
+            "finnhubIndustry": "Technology",
+            "country": "US",
+            "type": "EQ",
         }
 
         with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
@@ -114,7 +117,30 @@ class TestGetProfile:
         assert response.data is not None
         assert isinstance(response.data, CompanyIdentity)
         assert response.data.name == "Apple Inc."
+        assert response.data.industry == "Technology"
+        assert response.data.country == "US"
+        assert response.data.security_type == "eq"
         assert response.error is None
+
+    async def test_normalizes_security_type_to_lowercase(self, adapter: FinnhubAdapter) -> None:
+        raw_payload = {
+            "name": "SPDR S&P 500 ETF",
+            "exchange": "NYSE",
+            "currency": "USD",
+            "type": "ETF",
+        }
+
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_profile("SPY")
+
+        assert response.data is not None
+        assert response.data.security_type == "etf"
 
     async def test_returns_error_on_missing_name(self, adapter: FinnhubAdapter) -> None:
         raw_payload = {"ticker": "AAPL", "exchange": "NASDAQ"}

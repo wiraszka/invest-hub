@@ -34,22 +34,32 @@ export function AnalyzeProvider({ children }: { children: ReactNode }) {
     setAnalyzing(true);
 
     const initialStatus: Record<string, AnalysisStatus> = {};
-    for (const t of tickers) initialStatus[t] = "idle";
+    for (const ticker of tickers) initialStatus[ticker] = "idle";
     setAnalysisStatus(initialStatus);
 
     for (const ticker of tickers) {
       setAnalysisStatus((prev) => ({ ...prev, [ticker]: "loading" }));
 
       try {
-        const metaRes = await fetch(
-          `${base}/api/v1/investments/metadata/${ticker}`,
-          {
-            method: "POST",
-          },
-        );
+        const res = await fetch(`${base}/api/v1/analysis/${ticker}/data`, {
+          method: "POST",
+        });
 
-        if (metaRes.ok) {
-          const meta: SymbolMetadata = await metaRes.json();
+        if (res.ok) {
+          const data = await res.json();
+          const meta: SymbolMetadata = {
+            ticker: data.ticker,
+            asset_type: (data.template_key ?? "").startsWith("etf")
+              ? "ETF"
+              : "Stock",
+            sector: data.sector ?? null,
+            industry: data.industry ?? null,
+            country: null,
+            sector_weights: null,
+            country_weights: null,
+            has_analysis: true,
+            fetched_at: data.generated_at,
+          };
           setSymbolMetadata((prev) => ({ ...prev, [ticker]: meta }));
         }
 

@@ -2,10 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  canonicalTicker,
-  type SymbolMetadata,
-} from "@/components/investments/ChartsSection";
+import type { SymbolMetadata } from "@/components/investments/ChartsSection";
 import ChartsSection from "@/components/investments/ChartsSection";
 import ColumnsPopover from "@/components/investments/ColumnsPopover";
 import CsvDropzone from "@/components/investments/CsvDropzone";
@@ -49,6 +46,9 @@ export default function InvestmentsPage() {
     startAnalyze,
   } = useAnalyze();
 
+  const [resolvedCanonicals, setResolvedCanonicals] = useState<
+    Record<string, string>
+  >({});
   const [positions, setPositions] = useState<Position[] | null>(null);
   const [transactions, setTransactions] = useState<Transaction[] | null>(null);
   const [holdings, setHoldings] = useState<HoldingRecord[]>([]);
@@ -124,33 +124,59 @@ export default function InvestmentsPage() {
         }
       }
 
+      let holdingsData: HoldingRecord[] = [];
       if (holdingsRes.ok) {
-        const holdingsData: HoldingRecord[] = await holdingsRes.json();
+        holdingsData = await holdingsRes.json();
         setHoldings(holdingsData);
       }
 
-      const nonCryptoTickers = [
+      const uniqueSymbols = [
         ...new Set(
           posData
             .filter((p) => p.account !== "Crypto")
-            .map((p) => canonicalTicker(p.symbol, p.currency)),
+            .map((p) => p.symbol),
         ),
       ];
 
-      if (nonCryptoTickers.length > 0) {
-        const metaRes = await fetch(
-          `${base}/api/v1/investments/metadata?tickers=${nonCryptoTickers.join(",")}`,
-        );
-        if (metaRes.ok) {
-          const metaData: Record<string, SymbolMetadata> = await metaRes.json();
-          setSymbolMetadata(metaData);
+      if (uniqueSymbols.length > 0) {
+        const symbolExchangeMap = new Map<string, string>();
+        for (const h of holdingsData) {
+          if (h.exchange) {
+            if (h.symbol) symbolExchangeMap.set(h.symbol, h.exchange);
+            if (h.raw_symbol) symbolExchangeMap.set(h.raw_symbol, h.exchange);
+          }
+        }
 
-          const withAnalysis = new Set(
-            Object.values(metaData)
-              .filter((m) => m.has_analysis)
-              .map((m) => m.ticker),
+        const resolveItems = uniqueSymbols.map((symbol) => ({
+          symbol,
+          exchange: symbolExchangeMap.get(symbol) ?? null,
+        }));
+
+        const resolveRes = await fetch(`${base}/api/v1/investments/resolve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(resolveItems),
+        });
+
+        if (resolveRes.ok) {
+          const resolved: Record<string, string> = await resolveRes.json();
+          setResolvedCanonicals(resolved);
+
+          const canonicals = [...new Set(Object.values(resolved))];
+          const metaRes = await fetch(
+            `${base}/api/v1/investments/metadata?tickers=${canonicals.join(",")}`,
           );
-          setAnalyzedTickers(withAnalysis);
+          if (metaRes.ok) {
+            const metaData: Record<string, SymbolMetadata> =
+              await metaRes.json();
+            setSymbolMetadata(metaData);
+            const withAnalysis = new Set(
+              Object.values(metaData)
+                .filter((m) => m.has_analysis)
+                .map((m) => m.ticker),
+            );
+            setAnalyzedTickers(withAnalysis);
+          }
         }
       }
     } catch (err) {
@@ -265,9 +291,9 @@ export default function InvestmentsPage() {
     if (!positions || !base) return;
     const tickers = [
       ...new Set(
-        positions
+        allPositions
           .filter((p) => p.account !== "Crypto")
-          .map((p) => canonicalTicker(p.symbol, p.currency)),
+          .map((p) => resolvedCanonicals[p.symbol] ?? p.symbol),
       ),
     ];
     startAnalyze(tickers, base);
@@ -381,6 +407,7 @@ export default function InvestmentsPage() {
           <ChartsSection
             positions={allPositions}
             symbolMetadata={symbolMetadata}
+            resolvedCanonicals={resolvedCanonicals}
             metadataReady={metadataReady}
             groupingAssignments={groupingAssignments}
             sectorOverrides={sectorOverrides}
@@ -449,6 +476,7 @@ export default function InvestmentsPage() {
                       analysisStatus={analysisStatus}
                       analyzedTickers={analyzedTickers}
                       symbolMetadata={symbolMetadata}
+                      resolvedCanonicals={resolvedCanonicals}
                       {...tableProps}
                     />
                   </section>
@@ -468,6 +496,7 @@ export default function InvestmentsPage() {
                   analysisStatus={analysisStatus}
                   analyzedTickers={analyzedTickers}
                   symbolMetadata={symbolMetadata}
+                  resolvedCanonicals={resolvedCanonicals}
                   {...tableProps}
                 />
               )}

@@ -145,6 +145,12 @@ class TestGetProfile:
             "longName": "Apple Inc.",
             "exchange": "NMS",
             "currency": "USD",
+            "sector": "Technology",
+            "industry": "Consumer Electronics",
+            "longBusinessSummary": "Apple designs consumer electronics.",
+            "country": "United States",
+            "fullTimeEmployees": 150000,
+            "quoteType": "EQUITY",
         }
         ticker = _mock_ticker(info=info)
 
@@ -154,6 +160,11 @@ class TestGetProfile:
         assert response.data is not None
         assert isinstance(response.data, CompanyIdentity)
         assert response.data.name == "Apple Inc."
+        assert response.data.sector == "Technology"
+        assert response.data.industry == "Consumer Electronics"
+        assert response.data.country == "United States"
+        assert response.data.employees == 150000
+        assert response.data.security_type == "equity"
         assert response.error is None
 
     async def test_uses_shortName_fallback(self, adapter: YFinanceAdapter) -> None:
@@ -165,6 +176,21 @@ class TestGetProfile:
 
         assert response.data is not None
         assert response.data.name == "Apple"
+
+    async def test_normalizes_etf_security_type(self, adapter: YFinanceAdapter) -> None:
+        info = {
+            "longName": "SPDR S&P 500 ETF Trust",
+            "exchange": "PCX",
+            "currency": "USD",
+            "quoteType": "ETF",
+        }
+        ticker = _mock_ticker(info=info)
+
+        with patch.object(adapter, "_fetch_ticker", new=AsyncMock(return_value=ticker)):
+            response = await adapter.get_profile("SPY")
+
+        assert response.data is not None
+        assert response.data.security_type == "etf"
 
     async def test_returns_error_when_no_name(self, adapter: YFinanceAdapter) -> None:
         ticker = _mock_ticker(info={"exchange": "NMS"})

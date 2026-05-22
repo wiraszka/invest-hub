@@ -30,3 +30,6 @@ __pycache__
 PROJECT_OUTLINE.md
 .vercel
 .env*.local
+
+# Personal
+llm-prompts/

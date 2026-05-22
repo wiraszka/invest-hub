@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,7 +8,7 @@ from services.price import get_current_price
 
 client = TestClient(app)
 
-MOCK_PRICE = {"ticker": "NNE", "price": 18.42}
+MOCK_PRICE = {"ticker": "NNE", "price": 18.42, "currency": "USD"}
 MOCK_HISTORY = {
     "ticker": "NNE",
     "history": [
@@ -19,7 +19,7 @@ MOCK_HISTORY = {
 
 
 def test_current_price_returns_ticker_and_price():
-    with patch("routers.price.get_current_price", return_value=MOCK_PRICE):
+    with patch("routers.price.get_current_price", new=AsyncMock(return_value=MOCK_PRICE)):
         response = client.get("/api/v1/price/NNE")
 
     assert response.status_code == 200
@@ -29,21 +29,21 @@ def test_current_price_returns_ticker_and_price():
 
 
 def test_current_price_uppercases_ticker():
-    with patch("routers.price.get_current_price", return_value=MOCK_PRICE) as mock:
+    with patch("routers.price.get_current_price", new=AsyncMock(return_value=MOCK_PRICE)) as mock:
         client.get("/api/v1/price/nne")
 
     mock.assert_called_once_with("NNE")
 
 
 def test_current_price_returns_404_on_invalid_ticker():
-    with patch("routers.price.get_current_price", side_effect=ValueError("Not found")):
+    with patch("routers.price.get_current_price", new=AsyncMock(side_effect=ValueError("Not found"))):
         response = client.get("/api/v1/price/INVALID")
 
     assert response.status_code == 404
 
 
 def test_price_history_returns_ticker_and_history():
-    with patch("routers.price.get_price_history", return_value=MOCK_HISTORY):
+    with patch("routers.price.get_price_history", new=AsyncMock(return_value=MOCK_HISTORY)):
         response = client.get("/api/v1/price/NNE/history")
 
     assert response.status_code == 200
@@ -54,7 +54,7 @@ def test_price_history_returns_ticker_and_history():
 
 
 def test_price_history_returns_404_on_invalid_ticker():
-    with patch("routers.price.get_price_history", side_effect=ValueError("Not found")):
+    with patch("routers.price.get_price_history", new=AsyncMock(side_effect=ValueError("Not found"))):
         response = client.get("/api/v1/price/INVALID/history")
 
     assert response.status_code == 404
@@ -65,44 +65,83 @@ def test_price_history_returns_404_on_invalid_ticker():
 # ---------------------------------------------------------------------------
 
 
-def _td_ok_response(price: float) -> MagicMock:
-    mock = MagicMock()
-    mock.raise_for_status = MagicMock()
-    mock.json.return_value = {"price": str(price)}
-    return mock
+@pytest.mark.asyncio
+async def test_get_current_price_returns_twelvedata_price_when_available():
+    from datetime import datetime, timezone
 
+    from models.market_data import Quote
 
-def test_get_current_price_returns_twelvedata_price_when_available():
-    with patch("services.price.requests.get", return_value=_td_ok_response(18.42)):
-        result = get_current_price("NNE")
+    mock_quote = Quote(symbol="NNE", price=18.42, currency="USD", source="twelvedata", fetched_at=datetime.now(timezone.utc))
+    mock_adapter = MagicMock()
+    mock_adapter.get_quote = AsyncMock(
+        return_value=type("R", (), {"data": mock_quote, "error": None})()
+    )
+
+    with patch("services.price.registry") as mock_registry:
+        mock_registry.for_capability.return_value = [mock_adapter]
+        result = await get_current_price("NNE")
 
     assert result["ticker"] == "NNE"
     assert result["price"] == 18.42
+    assert result["currency"] == "USD"
 
 
-def test_get_current_price_falls_back_to_fmp_when_twelvedata_raises():
-    with patch("services.price.requests.get", side_effect=Exception("TD down")):
-        with patch("services.price.get_quote_price", return_value=42.50):
-            result = get_current_price("NNE")
+@pytest.mark.asyncio
+async def test_get_current_price_falls_back_to_fmp_when_twelvedata_fails():
+    from datetime import datetime, timezone
+
+    from models.market_data import Quote
+
+    mock_quote = Quote(symbol="NNE", price=42.50, currency="USD", source="fmp", fetched_at=datetime.now(timezone.utc))
+    mock_td = MagicMock()
+    mock_td.get_quote = AsyncMock(
+        return_value=type("R", (), {"data": None, "error": "TD down"})()
+    )
+    mock_fmp = MagicMock()
+    mock_fmp.get_quote = AsyncMock(
+        return_value=type("R", (), {"data": mock_quote, "error": None})()
+    )
+
+    with patch("services.price.registry") as mock_registry:
+        mock_registry.for_capability.return_value = [mock_td, mock_fmp]
+        result = await get_current_price("NNE")
 
     assert result["ticker"] == "NNE"
     assert result["price"] == 42.50
+    assert result["currency"] == "USD"
 
 
-def test_get_current_price_falls_back_to_fmp_when_twelvedata_returns_error_body():
-    bad_response = MagicMock()
-    bad_response.raise_for_status = MagicMock()
-    bad_response.json.return_value = {"message": "Invalid API key"}
+@pytest.mark.asyncio
+async def test_get_current_price_includes_currency_from_quote():
+    from datetime import datetime, timezone
 
-    with patch("services.price.requests.get", return_value=bad_response):
-        with patch("services.price.get_quote_price", return_value=42.50):
-            result = get_current_price("NNE")
+    from models.market_data import Quote
 
-    assert result["price"] == 42.50
+    mock_quote = Quote(symbol="SU.TO", price=55.10, currency="CAD", source="twelvedata", fetched_at=datetime.now(timezone.utc))
+    mock_adapter = MagicMock()
+    mock_adapter.get_quote = AsyncMock(
+        return_value=type("R", (), {"data": mock_quote, "error": None})()
+    )
+
+    with patch("services.price.registry") as mock_registry:
+        mock_registry.for_capability.return_value = [mock_adapter]
+        result = await get_current_price("SU.TO")
+
+    assert result["currency"] == "CAD"
 
 
-def test_get_current_price_raises_when_both_sources_fail():
-    with patch("services.price.requests.get", side_effect=Exception("TD down")):
-        with patch("services.price.get_quote_price", return_value=None):
-            with pytest.raises(ValueError, match="price"):
-                get_current_price("NNE")
+@pytest.mark.asyncio
+async def test_get_current_price_raises_when_both_sources_fail():
+    mock_td = MagicMock()
+    mock_td.get_quote = AsyncMock(
+        return_value=type("R", (), {"data": None, "error": "TD down"})()
+    )
+    mock_fmp = MagicMock()
+    mock_fmp.get_quote = AsyncMock(
+        return_value=type("R", (), {"data": None, "error": "FMP down"})()
+    )
+
+    with patch("services.price.registry") as mock_registry:
+        mock_registry.for_capability.return_value = [mock_td, mock_fmp]
+        with pytest.raises(ValueError, match="price"):
+            await get_current_price("NNE")

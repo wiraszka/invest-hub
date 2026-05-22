@@ -16,6 +16,8 @@ from models.market_data import (
     Financials,
     IncomeStatement,
     KeyMetrics,
+    PriceHistory,
+    PricePoint,
     ProviderResponse,
     Quote,
 )
@@ -149,8 +151,14 @@ class FMPAdapter(IMarketDataAdapter):
                         period=period,
                         market_cap=entry.get("marketCap"),
                         enterprise_value=entry.get("enterpriseValue"),
+                        pe_ratio=entry.get("peRatio"),
                         ev_ebitda=entry.get("evToEBITDA"),
+                        price_to_book=entry.get("pbRatio"),
                         roe=entry.get("returnOnEquity"),
+                        eps=entry.get("eps"),
+                        dividend_yield=entry.get("dividendYield"),
+                        beta=entry.get("beta"),
+                        debt_to_equity=entry.get("debtToEquity"),
                     )
 
                 raw_combined = {
@@ -175,6 +183,44 @@ class FMPAdapter(IMarketDataAdapter):
                 self._circuit.record_failure()
                 return self.error_response(str(exc))
 
+    async def get_price_history(self, ticker: str, days: int = 365, interval: str = "1day") -> ProviderResponse[PriceHistory]:
+        try:
+            self._circuit.check()
+        except CircuitOpenError as exc:
+            return self.error_response(str(exc))
+
+        async with self._semaphore:
+            try:
+                from datetime import date, timedelta
+                start = (date.today() - timedelta(days=days)).strftime("%Y-%m-%d")
+                end = date.today().strftime("%Y-%m-%d")
+                async with httpx.AsyncClient() as client:
+                    raw = await self._get(
+                        client,
+                        "/historical-price-eod/full",
+                        symbol=ticker,
+                        **{"from": start, "to": end},
+                    )
+
+                if not raw or not isinstance(raw, dict) or not raw.get("historical"):
+                    self._circuit.record_failure()
+                    return self.error_response(f"No price history for {ticker}")
+
+                history = PriceHistory(
+                    ticker=ticker,
+                    history=[
+                        PricePoint(date=entry["date"], close=float(entry["close"]))
+                        for entry in reversed(raw["historical"])
+                        if entry.get("close") is not None
+                    ],
+                )
+                self._circuit.record_success()
+                return ProviderResponse(data=history, raw=raw, provider=self.name, fetched_at=self.now())
+            except Exception as exc:
+                self._circuit.record_failure()
+                logger.exception("fmp get_price_history error", extra={"ticker": ticker})
+                return self.error_response(str(exc))
+
     async def get_profile(self, ticker: str) -> ProviderResponse[CompanyIdentity]:
         try:
             self._circuit.check()
@@ -190,11 +236,20 @@ class FMPAdapter(IMarketDataAdapter):
                         return self.error_response(f"No profile for {ticker}")
 
                     entry = raw[0]
+                    employees = entry.get("fullTimeEmployees")
+                    security_type = "etf" if entry.get("isEtf") else ("fund" if entry.get("isFund") else "equity")
                     identity = CompanyIdentity(
                         isin=entry.get("isin"),
                         name=entry["companyName"],
                         exchange=entry.get("exchange"),
                         currency=entry.get("currency"),
+                        sector=entry.get("sector"),
+                        industry=entry.get("industry"),
+                        description=entry.get("description"),
+                        country=entry.get("country"),
+                        employees=int(employees) if employees else None,
+                        security_type=security_type,
+                        logo_url=entry.get("image") or None,
                     )
                     self._circuit.record_success()
                     return ProviderResponse(data=identity, raw=entry, provider=self.name, fetched_at=self.now())

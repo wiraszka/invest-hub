@@ -5,6 +5,7 @@ import logging
 import math
 from functools import partial
 
+import pandas as pd
 import yfinance as yf
 
 from adapters.base import IMarketDataAdapter
@@ -18,6 +19,8 @@ from models.market_data import (
     Financials,
     IncomeStatement,
     KeyMetrics,
+    PriceHistory,
+    PricePoint,
     ProviderResponse,
     Quote,
 )
@@ -28,7 +31,7 @@ logger = logging.getLogger(__name__)
 class YFinanceAdapter(IMarketDataAdapter):
     name = "yfinance"
     supported_exchanges = ["NYSE", "NASDAQ", "TSX", "TSXV", "OTC"]
-    capabilities = ["quote", "financials", "profile"]
+    capabilities = ["quote", "financials", "profile", "price_history"]
 
     def __init__(self) -> None:
         self._semaphore = asyncio.Semaphore(settings.yfinance_concurrency)
@@ -39,9 +42,23 @@ class YFinanceAdapter(IMarketDataAdapter):
         )
 
     async def _fetch_ticker(self, ticker: str) -> yf.Ticker:
-        """Run yfinance's synchronous Ticker fetch in a thread pool to avoid blocking the event loop."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, partial(yf.Ticker, ticker))
+
+    async def _fetch_all(
+        self, ticker: str
+    ) -> tuple[dict, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """Single fetch for all yfinance data. Avoids redundant .info calls when
+        get_quote/get_financials/get_profile are called for the same ticker."""
+        ticker_obj = await self._fetch_ticker(ticker)
+        loop = asyncio.get_event_loop()
+        info, income, balance, cashflow = await asyncio.gather(
+            loop.run_in_executor(None, lambda: ticker_obj.info),
+            loop.run_in_executor(None, lambda: ticker_obj.financials),
+            loop.run_in_executor(None, lambda: ticker_obj.balance_sheet),
+            loop.run_in_executor(None, lambda: ticker_obj.cashflow),
+        )
+        return info or {}, income, balance, cashflow
 
     async def get_quote(self, ticker: str) -> ProviderResponse[Quote]:
         try:
@@ -51,9 +68,7 @@ class YFinanceAdapter(IMarketDataAdapter):
 
         async with self._semaphore:
             try:
-                ticker_obj = await self._fetch_ticker(ticker)
-                loop = asyncio.get_event_loop()
-                info = await loop.run_in_executor(None, lambda: ticker_obj.info)
+                info, _, _, _ = await self._fetch_all(ticker)
 
                 price = info.get("currentPrice") or info.get("regularMarketPrice")
                 if not price:
@@ -81,15 +96,7 @@ class YFinanceAdapter(IMarketDataAdapter):
 
         async with self._semaphore:
             try:
-                ticker_obj = await self._fetch_ticker(ticker)
-                loop = asyncio.get_event_loop()
-
-                info, income_stmt, balance_stmt, cashflow_stmt = await asyncio.gather(
-                    loop.run_in_executor(None, lambda: ticker_obj.info),
-                    loop.run_in_executor(None, lambda: ticker_obj.financials),
-                    loop.run_in_executor(None, lambda: ticker_obj.balance_sheet),
-                    loop.run_in_executor(None, lambda: ticker_obj.cashflow),
-                )
+                info, income_stmt, balance_stmt, cashflow_stmt = await self._fetch_all(ticker)
 
                 currency = info.get("financialCurrency", "USD")
 
@@ -145,9 +152,13 @@ class YFinanceAdapter(IMarketDataAdapter):
                         ev_ebitda=info.get("enterpriseToEbitda"),
                         price_to_book=info.get("priceToBook"),
                         roe=info.get("returnOnEquity"),
+                        eps=info.get("trailingEps"),
+                        forward_eps=info.get("forwardEps"),
+                        dividend_yield=info.get("dividendYield"),
+                        beta=info.get("beta"),
+                        debt_to_equity=info.get("debtToEquity"),
                     )
 
-                raw_combined = {"info": info}
                 financials = Financials(
                     currency=currency,
                     income=income,
@@ -156,9 +167,53 @@ class YFinanceAdapter(IMarketDataAdapter):
                     metrics=metrics,
                 )
                 self._circuit.record_success()
-                return ProviderResponse(data=financials, raw=raw_combined, provider=self.name, fetched_at=self.now())
+                return ProviderResponse(data=financials, raw={"info": info}, provider=self.name, fetched_at=self.now())
             except Exception as exc:
                 self._circuit.record_failure()
+                return self.error_response(str(exc))
+
+    # Maps canonical interval names (TwelveData style) to yfinance equivalents
+    _INTERVAL_MAP: dict[str, str] = {
+        "1day": "1d", "1week": "1wk", "1month": "1mo",
+        "1h": "1h", "30min": "30m", "15min": "15m", "5min": "5m", "1min": "1m",
+    }
+    _DAILY_INTERVALS = {"1d", "5d", "1wk", "1mo", "3mo"}
+
+    async def get_price_history(self, ticker: str, days: int = 365, interval: str = "1day") -> ProviderResponse[PriceHistory]:
+        try:
+            self._circuit.check()
+        except CircuitOpenError as exc:
+            return self.error_response(str(exc))
+
+        async with self._semaphore:
+            try:
+                from datetime import date, timedelta
+                yf_interval = self._INTERVAL_MAP.get(interval, interval)
+                ticker_obj = await self._fetch_ticker(ticker)
+                loop = asyncio.get_event_loop()
+                start = (date.today() - timedelta(days=days)).isoformat()
+                hist = await loop.run_in_executor(None, lambda: ticker_obj.history(start=start, interval=yf_interval))
+
+                if hist is None or hist.empty:
+                    self._circuit.record_failure()
+                    return self.error_response(f"No price history for {ticker}")
+
+                is_daily = yf_interval in self._DAILY_INTERVALS
+                history = PriceHistory(
+                    ticker=ticker,
+                    history=[
+                        PricePoint(
+                            date=str(idx.date()) if is_daily else idx.replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S"),
+                            close=float(row["Close"]),
+                        )
+                        for idx, row in hist.iterrows()
+                    ],
+                )
+                self._circuit.record_success()
+                return ProviderResponse(data=history, raw={}, provider=self.name, fetched_at=self.now())
+            except Exception as exc:
+                self._circuit.record_failure()
+                logger.exception("yfinance get_price_history error", extra={"ticker": ticker})
                 return self.error_response(str(exc))
 
     async def get_profile(self, ticker: str) -> ProviderResponse[CompanyIdentity]:
@@ -169,20 +224,26 @@ class YFinanceAdapter(IMarketDataAdapter):
 
         async with self._semaphore:
             try:
-                ticker_obj = await self._fetch_ticker(ticker)
-                loop = asyncio.get_event_loop()
-                info = await loop.run_in_executor(None, lambda: ticker_obj.info)
+                info, _, _, _ = await self._fetch_all(ticker)
 
                 name = info.get("longName") or info.get("shortName")
                 if not name:
                     self._circuit.record_failure()
                     return self.error_response(f"No profile for {ticker}")
 
+                raw_type = info.get("quoteType", "")
                 identity = CompanyIdentity(
                     isin=info.get("isin"),
                     name=name,
                     exchange=info.get("exchange"),
                     currency=info.get("currency"),
+                    sector=info.get("sector"),
+                    industry=info.get("industry"),
+                    description=info.get("longBusinessSummary"),
+                    country=info.get("country"),
+                    employees=info.get("fullTimeEmployees"),
+                    security_type=raw_type.lower() if raw_type else None,
+                    logo_url=info.get("logo_url") or None,
                 )
                 self._circuit.record_success()
                 return ProviderResponse(data=identity, raw=info, provider=self.name, fetched_at=self.now())
@@ -191,7 +252,7 @@ class YFinanceAdapter(IMarketDataAdapter):
                 return self.error_response(str(exc))
 
 
-def _safe_float(df, row: str, col) -> float | None:
+def _safe_float(df: pd.DataFrame, row: str, col) -> float | None:
     try:
         value = df.loc[row, col]
         if value is None:

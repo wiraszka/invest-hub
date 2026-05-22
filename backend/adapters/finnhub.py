@@ -89,11 +89,15 @@ class FinnhubAdapter(IMarketDataAdapter):
                         self._circuit.record_failure()
                         return self.error_response(f"No profile for {ticker}")
 
+                    raw_type = raw.get("type", "")
                     identity = CompanyIdentity(
                         isin=raw.get("isin"),
                         name=raw["name"],
                         exchange=raw.get("exchange"),
                         currency=raw.get("currency"),
+                        industry=raw.get("finnhubIndustry"),
+                        country=raw.get("country"),
+                        security_type=raw_type.lower() if raw_type else None,
                     )
                     self._circuit.record_success()
                     return ProviderResponse(data=identity, raw=raw, provider=self.name, fetched_at=self.now())

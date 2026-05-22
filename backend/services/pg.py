@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import and_, delete, func, select
@@ -56,6 +56,8 @@ async def replace_transactions_for_source(
     max_date: str,
     transactions: list[dict],
 ) -> None:
+    min_d = date.fromisoformat(min_date)
+    max_d = date.fromisoformat(max_date)
     async with _session() as session:
         async with session.begin():
             await session.execute(
@@ -63,8 +65,8 @@ async def replace_transactions_for_source(
                     and_(
                         Transaction.user_id == user_id,
                         Transaction.source == source,
-                        Transaction.transaction_date >= min_date,
-                        Transaction.transaction_date <= max_date,
+                        Transaction.transaction_date >= min_d,
+                        Transaction.transaction_date <= max_d,
                     )
                 )
             )
@@ -79,7 +81,7 @@ async def replace_transactions_for_source(
                         name=t.get("name"),
                         activity_type=t.get("activity_type"),
                         activity_sub_type=t.get("activity_sub_type"),
-                        transaction_date=t.get("transaction_date"),
+                        transaction_date=date.fromisoformat(t["transaction_date"]) if t.get("transaction_date") else None,
                         quantity=t.get("quantity"),
                         unit_price=t.get("unit_price"),
                         commission=t.get("commission"),
@@ -158,10 +160,7 @@ async def set_holdings(user_id: str, holdings: list[dict]) -> None:
                 session.add_all([
                     Holding(
                         user_id=user_id,
-                        symbol=h.get("symbol"),
-                        name=h.get("name"),
-                        quantity=h.get("quantity"),
-                        currency=h.get("market_price_currency"),
+                        exchange=h.get("exchange") or None,
                         raw_data=h,
                     )
                     for h in holdings

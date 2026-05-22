@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 interface SearchResult {
   ticker: string;
   name: string;
-  cik: string;
 }
 
 interface Props {
@@ -91,7 +90,7 @@ export default function ResearchSearchBar({ onSelect }: Props) {
           style={{ maxHeight: "calc(5 * 44px)" }}
         >
           {results.map((result) => (
-            <li key={result.cik}>
+            <li key={result.ticker}>
               <button
                 onClick={() => handleSelect(result)}
                 className="flex w-full items-baseline gap-2 px-4 py-2.5 text-left text-sm hover:bg-neutral-800"

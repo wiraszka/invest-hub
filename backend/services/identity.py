@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import uuid
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.config import settings
+from adapters.openfigi import OpenFIGIAdapter
 from db.pg_models import Company, CompanyProviderXref
 from models.market_data import CompanyIdentity
 
-_OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
+_openfigi = OpenFIGIAdapter()
 
 
 async def resolve_identity(
@@ -45,7 +44,8 @@ async def resolve_identity(
         )
 
     # 2. Try OpenFIGI
-    identity = await _lookup_openfigi(ticker, exchange_hint)
+    openfigi_response = await _openfigi.lookup(ticker, exchange_hint)
+    identity = openfigi_response.data
 
     # 3. Fall back to a stub if OpenFIGI returns nothing
     if identity is None:
@@ -55,35 +55,6 @@ async def resolve_identity(
     await _upsert_company(identity, ticker, provider, session)
     await session.commit()
     return identity
-
-
-async def _lookup_openfigi(ticker: str, exchange_code: str | None) -> CompanyIdentity | None:
-    payload: list[dict] = [{"idType": "TICKER", "idValue": ticker}]
-    if exchange_code:
-        payload[0]["exchCode"] = exchange_code
-
-    headers = {"Content-Type": "application/json"}
-    if settings.openfigi_api_key:
-        headers["X-OPENFIGI-APIKEY"] = settings.openfigi_api_key
-
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.post(_OPENFIGI_URL, json=payload, headers=headers)
-            if not response.is_success:
-                return None
-            data = response.json()
-            if not data or not data[0].get("data"):
-                return None
-
-            entry = data[0]["data"][0]
-            return CompanyIdentity(
-                figi=entry.get("figi"),
-                name=entry.get("name") or ticker,
-                exchange=entry.get("exchCode"),
-                currency=entry.get("marketSector"),  # OpenFIGI doesn't return currency directly
-            )
-    except Exception:
-        return None
 
 
 async def _upsert_company(

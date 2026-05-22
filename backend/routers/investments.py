@@ -1,7 +1,22 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, File, Header, HTTPException, Path, UploadFile
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    UploadFile,
+)
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from db.pg import get_db_session
+from db.pg_models import AnalysisReportRow
 from services.holdings import parse_holdings_csv
 from services.investments import build_positions, parse_csv, parse_questrade_xlsx
 from services.pg import (
@@ -14,6 +29,7 @@ from services.pg import (
     set_holdings,
     upsert_user_preferences,
 )
+from services.search import resolve_canonical
 
 router = APIRouter(prefix="/api/v1")
 
@@ -131,3 +147,58 @@ async def get_all_transactions(
 ) -> list[dict]:
     user_id = _require_user(x_user_id)
     return await get_transactions(user_id)
+
+
+# ---------------------------------------------------------------------------
+# Ticker resolution
+# ---------------------------------------------------------------------------
+
+
+class _ResolveItem(BaseModel):
+    symbol: str
+    exchange: str | None = None
+
+
+@router.post("/investments/resolve")
+async def resolve_tickers(items: list[_ResolveItem]) -> dict[str, str]:
+    if len(items) > 500:
+        raise HTTPException(status_code=422, detail={"code": "TOO_MANY_ITEMS", "message": "Maximum 500 symbols per request"})
+    return {item.symbol: resolve_canonical(item.symbol, item.exchange) for item in items}
+
+
+# ---------------------------------------------------------------------------
+# Ticker metadata (from cached analysis)
+# ---------------------------------------------------------------------------
+
+
+def _analysis_row_to_metadata(row: AnalysisReportRow) -> dict:
+    sc = row.structured_context or {}
+    profile = sc.get("profile") or {}
+    security_type = (profile.get("security_type") or "").lower()
+    asset_type = "ETF" if security_type in ("etf", "mutualfund", "fund") else "Stock"
+    return {
+        "ticker": row.ticker,
+        "asset_type": asset_type,
+        "sector": profile.get("sector"),
+        "industry": profile.get("industry"),
+        "country": profile.get("country"),
+        "sector_weights": None,
+        "country_weights": None,
+        "has_analysis": bool(row.report_template),
+        "fetched_at": row.generated_at.isoformat(),
+    }
+
+
+@router.get("/investments/metadata")
+async def get_symbols_metadata(
+    tickers: str = Query(..., min_length=1, description="Comma-separated canonical tickers"),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, dict]:
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    if not ticker_list:
+        return {}
+    result = await session.execute(
+        select(AnalysisReportRow).where(AnalysisReportRow.ticker.in_(ticker_list))
+    )
+    rows = result.scalars().all()
+    return {row.ticker: _analysis_row_to_metadata(row) for row in rows}

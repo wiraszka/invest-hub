@@ -1,62 +1,52 @@
 from __future__ import annotations
 
-import os
+import logging
 
-import requests
+from core.cache import cache
+from services.provider_registry import registry
 
-from services.fmp import get_quote_price
+logger = logging.getLogger(__name__)
 
-TD_BASE = "https://api.twelvedata.com"
-
-
-def _api_key() -> str:
-    key = os.environ.get("TD_API_KEY", "")
-    if not key:
-        raise RuntimeError("TD_API_KEY is not set")
-    return key
+_DAILY_INTERVALS = {"1day", "1week", "1month"}
+_HOURLY_TTL = 3600       # 1 h  — intraday data changes through the trading day
+_DAILY_TTL  = 86400      # 24 h — past daily closes never change
 
 
-def get_current_price(ticker: str) -> dict:
-    """Return current price for the given ticker. Falls back to FMP if TwelveData fails."""
-    try:
-        response = requests.get(
-            f"{TD_BASE}/price",
-            params={"symbol": ticker, "apikey": _api_key()},
-            timeout=10,
-        )
-        response.raise_for_status()
-        data = response.json()
-        if "price" in data:
-            return {"ticker": ticker, "price": float(data["price"])}
-    except Exception:
-        pass
-
-    fmp_price = get_quote_price(ticker)
-    if fmp_price is not None:
-        return {"ticker": ticker, "price": fmp_price}
+async def get_current_price(ticker: str) -> dict:
+    """Return current price. Falls back through the quote provider chain."""
+    for adapter in registry.for_capability("quote"):
+        response = await adapter.get_quote(ticker)
+        if response.data is not None:
+            return {"ticker": ticker, "price": response.data.price, "currency": response.data.currency}
+        logger.warning("quote miss", extra={"ticker": ticker, "provider": adapter.name})
 
     raise ValueError(f"Could not retrieve price for {ticker} from any source")
 
 
-def get_price_history(ticker: str, days: int = 365) -> dict:
-    """Return daily closing prices for the past `days` days."""
-    response = requests.get(
-        f"{TD_BASE}/time_series",
-        params={
-            "symbol": ticker,
-            "interval": "1day",
-            "outputsize": days,
-            "apikey": _api_key(),
-        },
-        timeout=15,
-    )
-    response.raise_for_status()
-    data = response.json()
-    if "values" not in data:
-        raise ValueError(data.get("message", "Unexpected response from TwelveData"))
+async def get_price_history(ticker: str, days: int = 365, interval: str = "1day") -> dict:
+    """Return closing prices. Falls back through the price_history provider chain."""
+    cache_key = ("price_history", ticker, days, interval)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
 
-    history = [
-        {"date": entry["datetime"], "close": float(entry["close"])}
-        for entry in reversed(data["values"])
-    ]
-    return {"ticker": ticker, "history": history}
+    adapters = registry.for_capability("price_history")
+    for adapter in adapters:
+        response = await adapter.get_price_history(ticker, days, interval)
+        if response.data is None:
+            logger.warning(
+                "price_history miss",
+                extra={"ticker": ticker, "provider": adapter.name, "interval": interval},
+            )
+            continue
+
+        result = {
+            "ticker": response.data.ticker,
+            "interval": interval,
+            "history": [{"date": p.date, "close": p.close} for p in response.data.history],
+        }
+        ttl = _DAILY_TTL if interval in _DAILY_INTERVALS else _HOURLY_TTL
+        cache.set(cache_key, result, ttl)
+        return result
+
+    raise ValueError(f"No price history for {ticker} from any provider")

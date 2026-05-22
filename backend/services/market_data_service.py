@@ -19,6 +19,10 @@ from models.market_data import CompanyIdentity, Financials, Quote
 from services.identity import resolve_identity
 from services.provider_registry import ProviderRegistry
 
+
+def _financials_sufficient(data: Financials) -> bool:
+    return bool(data.income or data.balance_sheet or data.cash_flow)
+
 logger = logging.getLogger(__name__)
 
 
@@ -117,7 +121,7 @@ class MarketDataService:
         for adapter in adapters:
             response = await adapter.get_financials(ticker)
             attempted.append(adapter.name)
-            if response.data is None:
+            if response.data is None or not _financials_sufficient(response.data):
                 logger.warning("adapter financials miss", extra={"ticker": ticker, "provider": adapter.name})
                 continue
 
@@ -147,23 +151,28 @@ class MarketDataService:
 
         # Identity resolution itself queries xref + OpenFIGI
         identity = await resolve_identity(ticker, "fmp", session, exchange_hint)
-        if identity.name != ticker:
-            cache.set(cache_key, identity, settings.profile_ttl_seconds)
-            return identity
 
-        # Fall back to adapter profile if identity is still just a stub
-        adapters = self._registry.for_capability("profile")
-        attempted: list[str] = []
-        for adapter in adapters:
-            response = await adapter.get_profile(ticker)
-            attempted.append(adapter.name)
-            if response.data is None:
-                continue
-            profile = response.data
-            cache.set(cache_key, profile, settings.profile_ttl_seconds)
-            return profile
+        # OpenFIGI provides canonical identity (figi, isin, name) but never
+        # description, sector, or industry. Always enrich from adapters when
+        # those fields are absent.
+        if not identity.description or not identity.sector:
+            adapters = self._registry.for_capability("profile")
+            for adapter in adapters:
+                response = await adapter.get_profile(ticker)
+                if response.data is None:
+                    continue
+                ap = response.data
+                identity.description = identity.description or ap.description
+                identity.sector = identity.sector or ap.sector
+                identity.industry = identity.industry or ap.industry
+                identity.employees = identity.employees or ap.employees
+                identity.country = identity.country or ap.country
+                if ap.name and ap.name != ticker:
+                    identity.name = ap.name
+                break
 
-        raise ProviderUnavailableError(ticker, attempted)
+        cache.set(cache_key, identity, settings.profile_ttl_seconds)
+        return identity
 
     async def _persist_quote(
         self,
