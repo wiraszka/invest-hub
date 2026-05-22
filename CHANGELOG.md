@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.20.0] - 2026-05-21
+
+### Added
+
+- Display company logo on symbol pages — fetched from providers (FMP first for reliability, yfinance fallback) and shown left of the company name with a white placeholder when unavailable
+- Symbol page header redesign: company name with ticker in parentheses on the top line, sector/industry/exchange/currency metadata on the row below, price quote aligned to the chart range controls — layout is fully set before analysis data loads with no shifting
+- Price quote on symbol pages now shows the correct currency (CAD for .TO and .V tickers) instead of always displaying USD
+- Symbol search in the sidebar — type a ticker or company name to navigate directly to any symbol page
+- Full analysis pipeline on the hexagonal adapter architecture: TwelveData, yfinance, FMP, Finnhub, SEC, and OpenFIGI adapters with per-adapter circuit breakers and TTL caching; phase 1 collects and classifies data, phase 2.5 runs independence detection via Haiku, phase 2 generates the written report via Sonnet
+
+### Changed
+
+- DB schema improvements: UUID server defaults, Numeric(20,4) precision on all financial amounts, composite indexes, holdings table stripped to raw JSON + exchange column, analysis_reports ticker promoted to primary key
+- Provider priority updated: yfinance runs before FMP for financials and profile (broader coverage including Canadian exchanges); FMP runs first for logo resolution
+
 ## [v1.19.0] - 2026-05-19
 
 ### Added
