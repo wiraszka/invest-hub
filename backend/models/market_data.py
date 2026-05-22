@@ -15,6 +15,13 @@ class CompanyIdentity(BaseModel):
     name: str
     exchange: str | None = None
     currency: str | None = None
+    sector: str | None = None
+    industry: str | None = None
+    description: str | None = None
+    country: str | None = None
+    employees: int | None = None
+    security_type: str | None = None
+    logo_url: str | None = None
 
 
 class Quote(BaseModel):
@@ -60,6 +67,11 @@ class KeyMetrics(BaseModel):
     ev_ebitda: float | None = None
     price_to_book: float | None = None
     roe: float | None = None
+    eps: float | None = None
+    forward_eps: float | None = None
+    dividend_yield: float | None = None
+    beta: float | None = None
+    debt_to_equity: float | None = None
 
 
 class Financials(BaseModel):
@@ -71,9 +83,58 @@ class Financials(BaseModel):
     metrics: KeyMetrics | None = None
 
 
+class PricePoint(BaseModel):
+    date: str
+    close: float
+
+
+class PriceHistory(BaseModel):
+    ticker: str
+    history: list[PricePoint]
+
+
+class TrendsPoint(BaseModel):
+    commodity: str
+    interest: int
+    momentum: float | None = None
+
+
+class TrendsResult(BaseModel):
+    series: list[dict]
+    latest: list[TrendsPoint]
+
+
 class ProviderResponse(BaseModel, Generic[T]):
     data: T | None = None
     raw: dict = {}
     provider: str
     fetched_at: datetime
     error: str | None = None
+
+
+class AnalysisData(BaseModel):
+    ticker: str
+    company_name: str
+    exchange: str | None
+    currency: str
+    sector: str | None = None
+    industry: str | None = None
+    logo_url: str | None = None
+    financials: dict
+    template_key: str
+    generated_at: datetime
+
+
+class AnalysisResult(BaseModel):
+    ticker: str
+    independence: str
+    chart_data: dict
+    analyzed_at: datetime
+
+
+class AnalysisReport(BaseModel):
+    ticker: str
+    report_template: str
+    independence: str
+    report_markdown: str
+    generated_at: datetime
