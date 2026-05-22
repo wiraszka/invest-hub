@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, File, Header, HTTPException, Path, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    UploadFile,
+)
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

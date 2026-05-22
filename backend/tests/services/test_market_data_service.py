@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from models.market_data import BalanceSheet, CashFlow, Financials, IncomeStatement
 from services.market_data_service import _financials_sufficient
 

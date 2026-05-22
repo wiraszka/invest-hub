@@ -8,7 +8,6 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from core.exceptions import ProviderUnavailableError
 from db.pg_models import AnalysisReportRow
 from models.market_data import AnalysisData, AnalysisReport, AnalysisResult
 from services.analysis import analyzer, context_builder, prompt_loader, report_generator

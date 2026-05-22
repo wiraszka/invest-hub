@@ -3,7 +3,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
-from models.market_data import CompanyIdentity, Financials, PriceHistory, ProviderResponse, Quote
+from models.market_data import (
+    CompanyIdentity,
+    Financials,
+    PriceHistory,
+    ProviderResponse,
+    Quote,
+)
 
 
 class IMarketDataAdapter(ABC):

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from services.analysis.analyzer import (
     _detect_independence_regex,
     _extract_targeted_window,

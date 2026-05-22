@@ -16,7 +16,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.sql import func, text as sa_text
+from sqlalchemy.sql import func
+from sqlalchemy.sql import text as sa_text
 
 
 class Base(DeclarativeBase):
