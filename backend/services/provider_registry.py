@@ -3,6 +3,8 @@ from __future__ import annotations
 from adapters.base import IMarketDataAdapter
 from adapters.finnhub import FinnhubAdapter
 from adapters.fmp import FMPAdapter
+from adapters.sec import SECAdapter
+from adapters.twelvedata import TwelveDataAdapter
 from adapters.yfinance_adapter import YFinanceAdapter
 from core.config import settings
 
@@ -15,9 +17,11 @@ class ProviderRegistry:
 
     def __init__(self) -> None:
         self._adapters: dict[str, IMarketDataAdapter] = {
+            "twelvedata": TwelveDataAdapter(),
             "fmp": FMPAdapter(),
             "finnhub": FinnhubAdapter(),
             "yfinance": YFinanceAdapter(),
+            "sec": SECAdapter(),
         }
 
     def for_capability(self, capability: str) -> list[IMarketDataAdapter]:
@@ -26,6 +30,7 @@ class ProviderRegistry:
             "quote": settings.quote_providers,
             "financials": settings.financials_providers,
             "profile": settings.profile_providers,
+            "price_history": settings.price_history_providers,
         }.get(capability, [])
 
         ordered = []

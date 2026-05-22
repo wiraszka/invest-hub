@@ -182,6 +182,13 @@ class TestGetProfile:
             "exchange": "NASDAQ",
             "currency": "USD",
             "isin": "US0378331005",
+            "sector": "Technology",
+            "industry": "Consumer Electronics",
+            "description": "Apple designs consumer electronics.",
+            "country": "US",
+            "fullTimeEmployees": "150000",
+            "isEtf": False,
+            "isFund": False,
         }]
 
         with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
@@ -197,7 +204,34 @@ class TestGetProfile:
         assert isinstance(response.data, CompanyIdentity)
         assert response.data.name == "Apple Inc."
         assert response.data.exchange == "NASDAQ"
+        assert response.data.sector == "Technology"
+        assert response.data.industry == "Consumer Electronics"
+        assert response.data.country == "US"
+        assert response.data.employees == 150000
+        assert response.data.security_type == "equity"
         assert response.error is None
+
+    async def test_returns_etf_security_type(self, adapter: FMPAdapter) -> None:
+        raw_payload = [{
+            "symbol": "SPY",
+            "companyName": "SPDR S&P 500 ETF Trust",
+            "exchange": "NYSE",
+            "currency": "USD",
+            "isEtf": True,
+            "isFund": False,
+        }]
+
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
+            with patch("adapters.fmp.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                response = await adapter.get_profile("SPY")
+
+        assert response.data is not None
+        assert response.data.security_type == "etf"
 
     async def test_returns_error_on_empty_profile(self, adapter: FMPAdapter) -> None:
         with patch.object(adapter, "_get", new=AsyncMock(return_value=None)):

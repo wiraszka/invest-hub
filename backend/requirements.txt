@@ -1,4 +1,5 @@
 alembic==1.18.4
+psycopg2-binary==2.9.10
 anthropic==0.94.0
 pytrends==4.9.2
 beautifulsoup4==4.14.3
