@@ -1,18 +1,29 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from core.exceptions import ProviderUnavailableError
+from db.pg import get_db_session
 from models.market_data import AnalysisData, AnalysisReport, AnalysisResult
 from routers.analysis import router
 
 app = FastAPI()
 app.include_router(router)
+
+
+async def _mock_session():
+    session = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=None)
+    yield session
+
+
+app.dependency_overrides[get_db_session] = _mock_session
 
 
 def _make_data() -> AnalysisData:
