@@ -1,12 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import PriceSection from "@/components/symbol/PriceSection";
-import ResearchPanel from "@/components/symbol/ResearchPanel";
+import SymbolOverview from "@/components/symbol/SymbolOverview";
+
+interface SymbolMeta {
+  exchange: string | null;
+  sector: string | null;
+  industry: string | null;
+  currency: string;
+  logoUrl: string | null;
+}
 
 export default function SymbolPage() {
   const { ticker } = useParams<{ ticker: string }>();
+  const [companyName, setCompanyName] = useState<string | undefined>();
+  const [meta, setMeta] = useState<SymbolMeta | undefined>();
 
   return (
     <div className="max-w-5xl mx-auto flex flex-col gap-8">
@@ -17,8 +28,22 @@ export default function SymbolPage() {
         ← Investments
       </Link>
 
-      <PriceSection key={ticker} ticker={ticker} />
-      <ResearchPanel key={ticker} ticker={ticker} />
+      <PriceSection
+        key={`price-${ticker}`}
+        ticker={ticker}
+        companyName={companyName}
+        exchange={meta?.exchange}
+        sector={meta?.sector}
+        industry={meta?.industry}
+        analysisCurrency={meta?.currency}
+        logoUrl={meta?.logoUrl}
+      />
+      <SymbolOverview
+        key={`overview-${ticker}`}
+        ticker={ticker}
+        onCompanyName={setCompanyName}
+        onMetadata={setMeta}
+      />
     </div>
   );
 }
