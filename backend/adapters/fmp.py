@@ -39,7 +39,9 @@ class FMPAdapter(IMarketDataAdapter):
             cooldown_seconds=settings.circuit_cooldown_seconds,
         )
 
-    async def _get(self, client: httpx.AsyncClient, path: str, **params) -> list | dict | None:
+    async def _get(
+        self, client: httpx.AsyncClient, path: str, **params
+    ) -> list | dict | None:
         try:
             response = await client.get(
                 f"{_BASE}{path}",
@@ -77,7 +79,9 @@ class FMPAdapter(IMarketDataAdapter):
                         fetched_at=self.now(),
                     )
                     self._circuit.record_success()
-                    return ProviderResponse(data=quote, raw=entry, provider=self.name, fetched_at=self.now())
+                    return ProviderResponse(
+                        data=quote, raw=entry, provider=self.name, fetched_at=self.now()
+                    )
             except Exception as exc:
                 self._circuit.record_failure()
                 logger.exception("fmp get_quote error", extra={"ticker": ticker})
@@ -92,10 +96,19 @@ class FMPAdapter(IMarketDataAdapter):
         async with self._semaphore:
             try:
                 async with httpx.AsyncClient() as client:
-                    income_raw, balance_raw, cashflow_raw, metrics_raw = await asyncio.gather(
+                    (
+                        income_raw,
+                        balance_raw,
+                        cashflow_raw,
+                        metrics_raw,
+                    ) = await asyncio.gather(
                         self._get(client, "/income-statement", symbol=ticker, limit=3),
-                        self._get(client, "/balance-sheet-statement", symbol=ticker, limit=1),
-                        self._get(client, "/cash-flow-statement", symbol=ticker, limit=3),
+                        self._get(
+                            client, "/balance-sheet-statement", symbol=ticker, limit=1
+                        ),
+                        self._get(
+                            client, "/cash-flow-statement", symbol=ticker, limit=3
+                        ),
                         self._get(client, "/key-metrics", symbol=ticker, limit=1),
                     )
 
@@ -108,7 +121,9 @@ class FMPAdapter(IMarketDataAdapter):
                 income = [
                     IncomeStatement(
                         period=f"FY{entry.get('fiscalYear') or entry.get('date', '')[:4]}",
-                        fiscal_year=int(entry["fiscalYear"]) if entry.get("fiscalYear") else None,
+                        fiscal_year=int(entry["fiscalYear"])
+                        if entry.get("fiscalYear")
+                        else None,
                         revenue=entry.get("revenue"),
                         gross_profit=entry.get("grossProfit"),
                         operating_income=entry.get("operatingIncome"),
@@ -154,11 +169,18 @@ class FMPAdapter(IMarketDataAdapter):
                         pe_ratio=entry.get("peRatio"),
                         ev_ebitda=entry.get("evToEBITDA"),
                         price_to_book=entry.get("pbRatio"),
+                        peg_ratio=entry.get("pegRatio"),
                         roe=entry.get("returnOnEquity"),
+                        return_on_assets=entry.get("returnOnAssets"),
                         eps=entry.get("eps"),
-                        dividend_yield=entry.get("dividendYield"),
+                        dividend_yield=entry.get("dividendYield") / 100
+                        if entry.get("dividendYield") is not None
+                        else None,
+                        payout_ratio=entry.get("payoutRatio"),
                         beta=entry.get("beta"),
                         debt_to_equity=entry.get("debtToEquity"),
+                        quick_ratio=entry.get("quickRatio"),
+                        current_ratio=entry.get("currentRatio"),
                     )
 
                 raw_combined = {
@@ -175,7 +197,12 @@ class FMPAdapter(IMarketDataAdapter):
                     metrics=metrics,
                 )
                 self._circuit.record_success()
-                return ProviderResponse(data=financials, raw=raw_combined, provider=self.name, fetched_at=self.now())
+                return ProviderResponse(
+                    data=financials,
+                    raw=raw_combined,
+                    provider=self.name,
+                    fetched_at=self.now(),
+                )
             except NormalizationError as exc:
                 self._circuit.record_failure()
                 return self.error_response(str(exc))
@@ -183,7 +210,9 @@ class FMPAdapter(IMarketDataAdapter):
                 self._circuit.record_failure()
                 return self.error_response(str(exc))
 
-    async def get_price_history(self, ticker: str, days: int = 365, interval: str = "1day") -> ProviderResponse[PriceHistory]:
+    async def get_price_history(
+        self, ticker: str, days: int = 365, interval: str = "1day"
+    ) -> ProviderResponse[PriceHistory]:
         try:
             self._circuit.check()
         except CircuitOpenError as exc:
@@ -192,6 +221,7 @@ class FMPAdapter(IMarketDataAdapter):
         async with self._semaphore:
             try:
                 from datetime import date, timedelta
+
                 start = (date.today() - timedelta(days=days)).strftime("%Y-%m-%d")
                 end = date.today().strftime("%Y-%m-%d")
                 async with httpx.AsyncClient() as client:
@@ -215,10 +245,14 @@ class FMPAdapter(IMarketDataAdapter):
                     ],
                 )
                 self._circuit.record_success()
-                return ProviderResponse(data=history, raw=raw, provider=self.name, fetched_at=self.now())
+                return ProviderResponse(
+                    data=history, raw=raw, provider=self.name, fetched_at=self.now()
+                )
             except Exception as exc:
                 self._circuit.record_failure()
-                logger.exception("fmp get_price_history error", extra={"ticker": ticker})
+                logger.exception(
+                    "fmp get_price_history error", extra={"ticker": ticker}
+                )
                 return self.error_response(str(exc))
 
     async def get_profile(self, ticker: str) -> ProviderResponse[CompanyIdentity]:
@@ -231,17 +265,26 @@ class FMPAdapter(IMarketDataAdapter):
             try:
                 async with httpx.AsyncClient() as client:
                     raw = await self._get(client, "/profile", symbol=ticker)
-                    if not raw or not isinstance(raw, list) or not raw[0].get("companyName"):
+                    if (
+                        not raw
+                        or not isinstance(raw, list)
+                        or not raw[0].get("companyName")
+                    ):
                         self._circuit.record_failure()
                         return self.error_response(f"No profile for {ticker}")
 
                     entry = raw[0]
                     employees = entry.get("fullTimeEmployees")
-                    security_type = "etf" if entry.get("isEtf") else ("fund" if entry.get("isFund") else "equity")
+                    security_type = (
+                        "etf"
+                        if entry.get("isEtf")
+                        else ("fund" if entry.get("isFund") else "equity")
+                    )
                     identity = CompanyIdentity(
                         isin=entry.get("isin"),
                         name=entry["companyName"],
-                        exchange=entry.get("exchange"),
+                        exchange=entry.get("exchangeShortName")
+                        or entry.get("exchange"),
                         currency=entry.get("currency"),
                         sector=entry.get("sector"),
                         industry=entry.get("industry"),
@@ -252,7 +295,12 @@ class FMPAdapter(IMarketDataAdapter):
                         logo_url=entry.get("image") or None,
                     )
                     self._circuit.record_success()
-                    return ProviderResponse(data=identity, raw=entry, provider=self.name, fetched_at=self.now())
+                    return ProviderResponse(
+                        data=identity,
+                        raw=entry,
+                        provider=self.name,
+                        fetched_at=self.now(),
+                    )
             except Exception as exc:
                 self._circuit.record_failure()
                 return self.error_response(str(exc))

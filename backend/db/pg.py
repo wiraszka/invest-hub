@@ -23,7 +23,9 @@ def _async_url() -> str:
     url = settings.database_url
     url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     parsed = urlparse(url)
-    filtered = {k: v[0] for k, v in parse_qs(parsed.query).items() if k not in _STRIP_PARAMS}
+    filtered = {
+        k: v[0] for k, v in parse_qs(parsed.query).items() if k not in _STRIP_PARAMS
+    }
     return urlunparse(parsed._replace(query=urlencode(filtered)))
 
 
@@ -31,12 +33,27 @@ def _get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         # NullPool is required for Vercel serverless — each invocation is stateless
-        _engine = create_async_engine(_async_url(), poolclass=NullPool, connect_args={"ssl": True})
+        _engine = create_async_engine(
+            _async_url(), poolclass=NullPool, connect_args={"ssl": True}
+        )
     return _engine
+
+
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """Return a session factory using the correctly-configured async engine.
+
+    Use this in standalone scripts instead of rolling a custom engine, so that
+    URL param stripping (channel_binding, sslmode, etc.) is applied consistently.
+    """
+    return async_sessionmaker(
+        _get_engine(), expire_on_commit=False, class_=AsyncSession
+    )
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency that yields an async database session."""
-    session_factory = async_sessionmaker(_get_engine(), expire_on_commit=False, class_=AsyncSession)
+    session_factory = async_sessionmaker(
+        _get_engine(), expire_on_commit=False, class_=AsyncSession
+    )
     async with session_factory() as session:
         yield session

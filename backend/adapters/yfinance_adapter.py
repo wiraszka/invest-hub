@@ -16,9 +16,12 @@ from models.market_data import (
     BalanceSheet,
     CashFlow,
     CompanyIdentity,
+    CompanyOfficer,
     Financials,
     IncomeStatement,
     KeyMetrics,
+    LeadershipData,
+    MarketIntelligence,
     PriceHistory,
     PricePoint,
     ProviderResponse,
@@ -28,10 +31,27 @@ from models.market_data import (
 logger = logging.getLogger(__name__)
 
 
+def _normalize_yf_exchange(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    if raw.startswith("Nasdaq"):
+        return "NASDAQ"
+    if raw == "Toronto":
+        return "TSX"
+    return raw
+
+
 class YFinanceAdapter(IMarketDataAdapter):
     name = "yfinance"
     supported_exchanges = ["NYSE", "NASDAQ", "TSX", "TSXV", "OTC"]
-    capabilities = ["quote", "financials", "profile", "price_history"]
+    capabilities = [
+        "quote",
+        "financials",
+        "profile",
+        "price_history",
+        "leadership",
+        "market_intelligence",
+    ]
 
     def __init__(self) -> None:
         self._semaphore = asyncio.Semaphore(settings.yfinance_concurrency)
@@ -44,6 +64,14 @@ class YFinanceAdapter(IMarketDataAdapter):
     async def _fetch_ticker(self, ticker: str) -> yf.Ticker:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, partial(yf.Ticker, ticker))
+
+    async def _fetch_info(self, ticker: str) -> dict:
+        """Fetch only the info dict — used by leadership and market_intelligence
+        which don't need the financial statement DataFrames."""
+        ticker_obj = await self._fetch_ticker(ticker)
+        loop = asyncio.get_event_loop()
+        info = await loop.run_in_executor(None, lambda: ticker_obj.info)
+        return info or {}
 
     async def _fetch_all(
         self, ticker: str
@@ -83,7 +111,9 @@ class YFinanceAdapter(IMarketDataAdapter):
                     fetched_at=self.now(),
                 )
                 self._circuit.record_success()
-                return ProviderResponse(data=quote, raw=info, provider=self.name, fetched_at=self.now())
+                return ProviderResponse(
+                    data=quote, raw=info, provider=self.name, fetched_at=self.now()
+                )
             except Exception as exc:
                 self._circuit.record_failure()
                 return self.error_response(str(exc))
@@ -96,7 +126,9 @@ class YFinanceAdapter(IMarketDataAdapter):
 
         async with self._semaphore:
             try:
-                info, income_stmt, balance_stmt, cashflow_stmt = await self._fetch_all(ticker)
+                info, income_stmt, balance_stmt, cashflow_stmt = await self._fetch_all(
+                    ticker
+                )
 
                 currency = info.get("financialCurrency", "USD")
 
@@ -104,15 +136,21 @@ class YFinanceAdapter(IMarketDataAdapter):
                 if income_stmt is not None and not income_stmt.empty:
                     for col in income_stmt.columns:
                         year = col.year if hasattr(col, "year") else str(col)[:4]
-                        income.append(IncomeStatement(
-                            period=f"FY{year}",
-                            fiscal_year=int(year),
-                            revenue=_safe_float(income_stmt, "Total Revenue", col),
-                            gross_profit=_safe_float(income_stmt, "Gross Profit", col),
-                            operating_income=_safe_float(income_stmt, "Operating Income", col),
-                            net_income=_safe_float(income_stmt, "Net Income", col),
-                            ebitda=_safe_float(income_stmt, "EBITDA", col),
-                        ))
+                        income.append(
+                            IncomeStatement(
+                                period=f"FY{year}",
+                                fiscal_year=int(year),
+                                revenue=_safe_float(income_stmt, "Total Revenue", col),
+                                gross_profit=_safe_float(
+                                    income_stmt, "Gross Profit", col
+                                ),
+                                operating_income=_safe_float(
+                                    income_stmt, "Operating Income", col
+                                ),
+                                net_income=_safe_float(income_stmt, "Net Income", col),
+                                ebitda=_safe_float(income_stmt, "EBITDA", col),
+                            )
+                        )
 
                 balance: BalanceSheet | None = None
                 if balance_stmt is not None and not balance_stmt.empty:
@@ -120,9 +158,13 @@ class YFinanceAdapter(IMarketDataAdapter):
                     year = col.year if hasattr(col, "year") else str(col)[:4]
                     balance = BalanceSheet(
                         period=f"FY{year}",
-                        cash=_safe_float(balance_stmt, "Cash And Cash Equivalents", col),
+                        cash=_safe_float(
+                            balance_stmt, "Cash And Cash Equivalents", col
+                        ),
                         total_debt=_safe_float(balance_stmt, "Total Debt", col),
-                        total_equity=_safe_float(balance_stmt, "Stockholders Equity", col),
+                        total_equity=_safe_float(
+                            balance_stmt, "Stockholders Equity", col
+                        ),
                         total_assets=_safe_float(balance_stmt, "Total Assets", col),
                     )
                     if balance.total_debt is not None and balance.cash is not None:
@@ -134,13 +176,19 @@ class YFinanceAdapter(IMarketDataAdapter):
                         year = col.year if hasattr(col, "year") else str(col)[:4]
                         ocf = _safe_float(cashflow_stmt, "Operating Cash Flow", col)
                         capex = _safe_float(cashflow_stmt, "Capital Expenditure", col)
-                        fcf = (ocf + capex) if (ocf is not None and capex is not None) else None
-                        cash_flow.append(CashFlow(
-                            period=f"FY{year}",
-                            operating_cash_flow=ocf,
-                            capex=capex,
-                            free_cash_flow=fcf,
-                        ))
+                        fcf = (
+                            (ocf + capex)
+                            if (ocf is not None and capex is not None)
+                            else None
+                        )
+                        cash_flow.append(
+                            CashFlow(
+                                period=f"FY{year}",
+                                operating_cash_flow=ocf,
+                                capex=capex,
+                                free_cash_flow=fcf,
+                            )
+                        )
 
                 metrics: KeyMetrics | None = None
                 if info:
@@ -149,14 +197,26 @@ class YFinanceAdapter(IMarketDataAdapter):
                         market_cap=info.get("marketCap"),
                         enterprise_value=info.get("enterpriseValue"),
                         pe_ratio=info.get("trailingPE"),
+                        forward_pe=info.get("forwardPE"),
                         ev_ebitda=info.get("enterpriseToEbitda"),
+                        enterprise_to_revenue=info.get("enterpriseToRevenue"),
                         price_to_book=info.get("priceToBook"),
+                        peg_ratio=info.get("pegRatio"),
                         roe=info.get("returnOnEquity"),
+                        return_on_assets=info.get("returnOnAssets"),
                         eps=info.get("trailingEps"),
                         forward_eps=info.get("forwardEps"),
-                        dividend_yield=info.get("dividendYield"),
+                        revenue_growth=info.get("revenueGrowth"),
+                        earnings_growth=info.get("earningsGrowth"),
+                        dividend_yield=info.get("dividendYield") / 100
+                        if info.get("dividendYield") is not None
+                        else None,
+                        dividend_rate=info.get("dividendRate"),
+                        payout_ratio=info.get("payoutRatio"),
                         beta=info.get("beta"),
                         debt_to_equity=info.get("debtToEquity"),
+                        quick_ratio=info.get("quickRatio"),
+                        current_ratio=info.get("currentRatio"),
                     )
 
                 financials = Financials(
@@ -167,19 +227,32 @@ class YFinanceAdapter(IMarketDataAdapter):
                     metrics=metrics,
                 )
                 self._circuit.record_success()
-                return ProviderResponse(data=financials, raw={"info": info}, provider=self.name, fetched_at=self.now())
+                return ProviderResponse(
+                    data=financials,
+                    raw={"info": info},
+                    provider=self.name,
+                    fetched_at=self.now(),
+                )
             except Exception as exc:
                 self._circuit.record_failure()
                 return self.error_response(str(exc))
 
     # Maps canonical interval names (TwelveData style) to yfinance equivalents
     _INTERVAL_MAP: dict[str, str] = {
-        "1day": "1d", "1week": "1wk", "1month": "1mo",
-        "1h": "1h", "30min": "30m", "15min": "15m", "5min": "5m", "1min": "1m",
+        "1day": "1d",
+        "1week": "1wk",
+        "1month": "1mo",
+        "1h": "1h",
+        "30min": "30m",
+        "15min": "15m",
+        "5min": "5m",
+        "1min": "1m",
     }
     _DAILY_INTERVALS = {"1d", "5d", "1wk", "1mo", "3mo"}
 
-    async def get_price_history(self, ticker: str, days: int = 365, interval: str = "1day") -> ProviderResponse[PriceHistory]:
+    async def get_price_history(
+        self, ticker: str, days: int = 365, interval: str = "1day"
+    ) -> ProviderResponse[PriceHistory]:
         try:
             self._circuit.check()
         except CircuitOpenError as exc:
@@ -188,11 +261,14 @@ class YFinanceAdapter(IMarketDataAdapter):
         async with self._semaphore:
             try:
                 from datetime import date, timedelta
+
                 yf_interval = self._INTERVAL_MAP.get(interval, interval)
                 ticker_obj = await self._fetch_ticker(ticker)
                 loop = asyncio.get_event_loop()
                 start = (date.today() - timedelta(days=days)).isoformat()
-                hist = await loop.run_in_executor(None, lambda: ticker_obj.history(start=start, interval=yf_interval))
+                hist = await loop.run_in_executor(
+                    None, lambda: ticker_obj.history(start=start, interval=yf_interval)
+                )
 
                 if hist is None or hist.empty:
                     self._circuit.record_failure()
@@ -203,17 +279,114 @@ class YFinanceAdapter(IMarketDataAdapter):
                     ticker=ticker,
                     history=[
                         PricePoint(
-                            date=str(idx.date()) if is_daily else idx.replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S"),
+                            date=str(idx.date())
+                            if is_daily
+                            else idx.replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S"),
                             close=float(row["Close"]),
                         )
                         for idx, row in hist.iterrows()
                     ],
                 )
                 self._circuit.record_success()
-                return ProviderResponse(data=history, raw={}, provider=self.name, fetched_at=self.now())
+                return ProviderResponse(
+                    data=history, raw={}, provider=self.name, fetched_at=self.now()
+                )
             except Exception as exc:
                 self._circuit.record_failure()
-                logger.exception("yfinance get_price_history error", extra={"ticker": ticker})
+                logger.exception(
+                    "yfinance get_price_history error", extra={"ticker": ticker}
+                )
+                return self.error_response(str(exc))
+
+    async def get_leadership(self, ticker: str) -> ProviderResponse[LeadershipData]:
+        try:
+            self._circuit.check()
+        except CircuitOpenError as exc:
+            return self.error_response(str(exc))
+
+        async with self._semaphore:
+            try:
+                info = await self._fetch_info(ticker)
+
+                raw_officers = info.get("companyOfficers") or []
+                officers: list[CompanyOfficer] = []
+                for entry in raw_officers[:5]:
+                    name = entry.get("name")
+                    title = entry.get("title")
+                    if not name or not title:
+                        continue
+                    officers.append(
+                        CompanyOfficer(
+                            name=name,
+                            title=title,
+                            age=entry.get("age"),
+                            total_pay=entry.get("totalPay"),
+                        )
+                    )
+
+                leadership = LeadershipData(
+                    officers=officers,
+                    held_percent_insiders=info.get("heldPercentInsiders"),
+                    held_percent_institutions=info.get("heldPercentInstitutions"),
+                    audit_risk=info.get("auditRisk"),
+                    board_risk=info.get("boardRisk"),
+                    compensation_risk=info.get("compensationRisk"),
+                    overall_governance_risk=info.get("overallRisk"),
+                )
+                self._circuit.record_success()
+                return ProviderResponse(
+                    data=leadership,
+                    raw={"info": info},
+                    provider=self.name,
+                    fetched_at=self.now(),
+                )
+            except Exception as exc:
+                self._circuit.record_failure()
+                logger.exception(
+                    "yfinance get_leadership error", extra={"ticker": ticker}
+                )
+                return self.error_response(str(exc))
+
+    async def get_market_intelligence(
+        self, ticker: str
+    ) -> ProviderResponse[MarketIntelligence]:
+        try:
+            self._circuit.check()
+        except CircuitOpenError as exc:
+            return self.error_response(str(exc))
+
+        async with self._semaphore:
+            try:
+                info = await self._fetch_info(ticker)
+
+                intelligence = MarketIntelligence(
+                    recommendation=info.get("recommendationKey"),
+                    recommendation_score=info.get("recommendationMean"),
+                    analyst_count=info.get("numberOfAnalystOpinions"),
+                    target_mean_price=info.get("targetMeanPrice"),
+                    target_median_price=info.get("targetMedianPrice"),
+                    target_high_price=info.get("targetHighPrice"),
+                    target_low_price=info.get("targetLowPrice"),
+                    shares_short=info.get("sharesShort"),
+                    short_ratio=info.get("shortRatio"),
+                    short_percent_of_float=info.get("shortPercentOfFloat"),
+                    fifty_two_week_high=info.get("fiftyTwoWeekHigh"),
+                    fifty_two_week_low=info.get("fiftyTwoWeekLow"),
+                    fifty_day_average=info.get("fiftyDayAverage"),
+                    two_hundred_day_average=info.get("twoHundredDayAverage"),
+                )
+                self._circuit.record_success()
+                return ProviderResponse(
+                    data=intelligence,
+                    raw={"info": info},
+                    provider=self.name,
+                    fetched_at=self.now(),
+                )
+            except Exception as exc:
+                self._circuit.record_failure()
+                logger.exception(
+                    "yfinance get_market_intelligence error", extra={"ticker": ticker}
+                )
                 return self.error_response(str(exc))
 
     async def get_profile(self, ticker: str) -> ProviderResponse[CompanyIdentity]:
@@ -235,7 +408,7 @@ class YFinanceAdapter(IMarketDataAdapter):
                 identity = CompanyIdentity(
                     isin=info.get("isin"),
                     name=name,
-                    exchange=info.get("exchange"),
+                    exchange=_normalize_yf_exchange(info.get("fullExchangeName")),
                     currency=info.get("currency"),
                     sector=info.get("sector"),
                     industry=info.get("industry"),
@@ -246,7 +419,9 @@ class YFinanceAdapter(IMarketDataAdapter):
                     logo_url=info.get("logo_url") or None,
                 )
                 self._circuit.record_success()
-                return ProviderResponse(data=identity, raw=info, provider=self.name, fetched_at=self.now())
+                return ProviderResponse(
+                    data=identity, raw=info, provider=self.name, fetched_at=self.now()
+                )
             except Exception as exc:
                 self._circuit.record_failure()
                 return self.error_response(str(exc))

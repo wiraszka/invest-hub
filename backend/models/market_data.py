@@ -9,12 +9,13 @@ T = TypeVar("T")
 
 
 class CompanyIdentity(BaseModel):
-    canonical_id: str | None = None
+    security_id: str | None = None
     isin: str | None = None
     figi: str | None = None
     name: str
     exchange: str | None = None
     currency: str | None = None
+    # Profile enrichment fields (populated by get_profile(), not resolve_identity())
     sector: str | None = None
     industry: str | None = None
     description: str | None = None
@@ -25,7 +26,7 @@ class CompanyIdentity(BaseModel):
 
 
 class Quote(BaseModel):
-    canonical_id: str | None = None
+    security_id: str | None = None
     symbol: str
     price: float
     currency: str
@@ -64,23 +65,74 @@ class KeyMetrics(BaseModel):
     market_cap: float | None = None
     enterprise_value: float | None = None
     pe_ratio: float | None = None
+    forward_pe: float | None = None
     ev_ebitda: float | None = None
+    enterprise_to_revenue: float | None = None
     price_to_book: float | None = None
+    peg_ratio: float | None = None
     roe: float | None = None
+    return_on_assets: float | None = None
     eps: float | None = None
     forward_eps: float | None = None
+    revenue_growth: float | None = None
+    earnings_growth: float | None = None
     dividend_yield: float | None = None
+    dividend_rate: float | None = None
+    payout_ratio: float | None = None
     beta: float | None = None
     debt_to_equity: float | None = None
+    quick_ratio: float | None = None
+    current_ratio: float | None = None
 
 
 class Financials(BaseModel):
-    canonical_id: str | None = None
+    security_id: str | None = None
     currency: str
     income: list[IncomeStatement] = []
     balance_sheet: BalanceSheet | None = None
     cash_flow: list[CashFlow] = []
     metrics: KeyMetrics | None = None
+
+
+class CompanyOfficer(BaseModel):
+    name: str
+    title: str
+    age: int | None = None
+    total_pay: int | None = None  # USD, most recent fiscal year
+
+
+class LeadershipData(BaseModel):
+    security_id: str | None = None
+    officers: list[CompanyOfficer] = []
+    held_percent_insiders: float | None = None
+    held_percent_institutions: float | None = None
+    audit_risk: int | None = None
+    board_risk: int | None = None
+    compensation_risk: int | None = None
+    overall_governance_risk: int | None = None
+
+
+class MarketIntelligence(BaseModel):
+    security_id: str | None = None
+    # Analyst consensus
+    recommendation: str | None = None
+    recommendation_score: float | None = None  # 1.0 = strong_buy → 5.0 = sell
+    analyst_count: int | None = None
+    target_mean_price: float | None = None
+    target_median_price: float | None = None
+    target_high_price: float | None = None
+    target_low_price: float | None = None
+    # Short interest
+    shares_short: int | None = None
+    short_ratio: float | None = None
+    short_percent_of_float: float | None = None
+    # Price context
+    fifty_two_week_high: float | None = None
+    fifty_two_week_low: float | None = None
+    fifty_day_average: float | None = None
+    two_hundred_day_average: float | None = None
+    # Peer companies (from Finnhub /stock/peers)
+    peers: list[str] = []
 
 
 class PricePoint(BaseModel):
@@ -112,6 +164,17 @@ class ProviderResponse(BaseModel, Generic[T]):
     error: str | None = None
 
 
+class FilingContext(BaseModel):
+    ticker: str
+    form_type: str
+    accession_number: str
+    filing_date: str  # ISO date string e.g. "2024-10-31"
+    item_1: str = ""
+    item_1a: str = ""
+    item_7: str = ""
+    fetched_at: datetime
+
+
 class AnalysisData(BaseModel):
     ticker: str
     company_name: str
@@ -120,7 +183,6 @@ class AnalysisData(BaseModel):
     sector: str | None = None
     industry: str | None = None
     logo_url: str | None = None
-    financials: dict
     template_key: str
     generated_at: datetime
 
@@ -138,3 +200,18 @@ class AnalysisReport(BaseModel):
     independence: str
     report_markdown: str
     generated_at: datetime
+
+
+class FormattedContext(BaseModel):
+    ticker: str
+    company_name: str
+    exchange: str | None
+    currency: str
+    template_key: str
+    sector: str | None = None
+    industry: str | None = None
+    metrics_block: str
+    business_summary: str
+    leadership_block: str
+    market_intelligence_block: str
+    filing_excerpt: str

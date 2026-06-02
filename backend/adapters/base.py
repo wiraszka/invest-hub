@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from models.market_data import (
     CompanyIdentity,
     Financials,
+    LeadershipData,
+    MarketIntelligence,
     PriceHistory,
     ProviderResponse,
     Quote,
@@ -15,22 +17,31 @@ from models.market_data import (
 class IMarketDataAdapter(ABC):
     name: str
     supported_exchanges: list[str]
-    capabilities: list[str]  # subset of: "quote", "financials", "profile", "price_history"
+    capabilities: list[
+        str
+    ]  # subset of: "quote", "financials", "profile", "price_history", "leadership", "market_intelligence"
 
     @abstractmethod
-    async def get_quote(self, ticker: str) -> ProviderResponse[Quote]:
-        ...
+    async def get_quote(self, ticker: str) -> ProviderResponse[Quote]: ...
 
     @abstractmethod
-    async def get_financials(self, ticker: str) -> ProviderResponse[Financials]:
-        ...
+    async def get_financials(self, ticker: str) -> ProviderResponse[Financials]: ...
 
     @abstractmethod
-    async def get_profile(self, ticker: str) -> ProviderResponse[CompanyIdentity]:
-        ...
+    async def get_profile(self, ticker: str) -> ProviderResponse[CompanyIdentity]: ...
 
-    async def get_price_history(self, ticker: str, days: int = 365, interval: str = "1day") -> ProviderResponse[PriceHistory]:
+    async def get_price_history(
+        self, ticker: str, days: int = 365, interval: str = "1day"
+    ) -> ProviderResponse[PriceHistory]:
         return self.error_response("price_history not supported by this adapter")
+
+    async def get_leadership(self, ticker: str) -> ProviderResponse[LeadershipData]:
+        return self.error_response("leadership not supported by this adapter")
+
+    async def get_market_intelligence(
+        self, ticker: str
+    ) -> ProviderResponse[MarketIntelligence]:
+        return self.error_response("market_intelligence not supported by this adapter")
 
     @staticmethod
     def now() -> datetime:

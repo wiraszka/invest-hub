@@ -31,6 +31,8 @@ class ProviderRegistry:
             "financials": settings.financials_providers,
             "profile": settings.profile_providers,
             "price_history": settings.price_history_providers,
+            "leadership": settings.leadership_providers,
+            "market_intelligence": settings.market_intelligence_providers,
         }.get(capability, [])
 
         ordered = []

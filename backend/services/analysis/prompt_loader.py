@@ -6,11 +6,31 @@ from pathlib import Path
 _PROMPTS_ROOT = Path(__file__).parents[3] / "llm-prompts"
 
 _TEMPLATE_PATHS: dict[str, str] = {
-    "pre-revenue/general": "pre-revenue/general.md",
-    "pre-revenue/mining": "pre-revenue/mining-pre-revenue.md",
-    "revenue-generating/general": "revenue-generating/general.md",
-    "revenue-generating/mining-producer": "revenue-generating/mining-producer.md",
-    "revenue-generating/oil-gas": "revenue-generating/oil&gas.md",
+    # ── Stock: revenue-generating ────────────────────────────────────────────
+    "general": "stock/revenue-generating/general.md",
+    "mining": "stock/revenue-generating/mining.md",
+    "energy": "stock/revenue-generating/oil-gas.md",
+    "tech": "stock/revenue-generating/tech.md",
+    "biotech": "stock/revenue-generating/biotech.md",
+    "financial": "stock/revenue-generating/general.md",  # fallback — no financial template yet
+    "reit": "stock/revenue-generating/reit.md",
+    # ── Stock: pre-revenue ───────────────────────────────────────────────────
+    "pre_revenue": "stock/pre-revenue/general.md",
+    "pre_revenue_mining": "stock/pre-revenue/mining.md",
+    "pre_revenue_biotech": "stock/pre-revenue/biotech.md",
+    # ── ETF ──────────────────────────────────────────────────────────────────
+    "etf": "etf/equity/broad.md",  # default ETF fallback
+    "etf_equity_broad": "etf/equity/broad.md",
+    "etf_equity_sector": "etf/equity/sector.md",
+    "etf_fixed_income_government": "etf/fixed-income/government.md",
+    "etf_fixed_income_credit": "etf/fixed-income/credit.md",
+    "etf_commodity": "etf/commodity/general.md",
+    # ── Legacy long-form keys (backward compatibility) ───────────────────────
+    "pre-revenue/general": "stock/pre-revenue/general.md",
+    "pre-revenue/mining": "stock/pre-revenue/mining.md",
+    "revenue-generating/general": "stock/revenue-generating/general.md",
+    "revenue-generating/mining-producer": "stock/revenue-generating/mining.md",
+    "revenue-generating/oil-gas": "stock/revenue-generating/oil-gas.md",
 }
 
 _cache: dict[str, tuple[str, str]] = {}
