@@ -198,6 +198,7 @@ def build_positions(transactions: list[dict]) -> list[dict]:
                 "currency": t.get("currency", "CAD"),
                 "shares_held": 0.0,
                 "cost_basis": 0.0,
+                "total_cost_deployed": 0.0,
                 "realized_pl": 0.0,
                 "dividends": 0.0,
                 "is_option": is_opt,
@@ -210,10 +211,13 @@ def build_positions(transactions: list[dict]) -> list[dict]:
             if sub_type == "BUY":
                 pos["shares_held"] += quantity
                 pos["cost_basis"] += abs(net_cash)
+                pos["total_cost_deployed"] += abs(net_cash)
             elif sub_type == "SELL":
                 shares_sold = abs(quantity)
                 current_shares = pos["shares_held"]
-                avg_cost = pos["cost_basis"] / current_shares if current_shares > 0 else 0.0
+                avg_cost = (
+                    pos["cost_basis"] / current_shares if current_shares > 0 else 0.0
+                )
                 cost_removed = avg_cost * shares_sold
                 pos["shares_held"] -= shares_sold
                 pos["cost_basis"] -= cost_removed

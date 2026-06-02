@@ -26,6 +26,7 @@ def parse_holdings_csv(content: str) -> list[dict]:
         market_price_currency = (row.get("Market Price Currency") or "CAD").strip()
 
         if market_value_currency == "CAD":
+            implied_fx = 1.0
             market_value_cad = market_value_native
             unrealized_pl_cad = unrealized_native
         else:
@@ -62,15 +63,14 @@ def parse_holdings_csv(content: str) -> list[dict]:
                     round(book_value_cad, 2) if book_value_cad is not None else None
                 ),
                 "market_value_cad": (
-                    round(market_value_cad, 2)
-                    if market_value_cad is not None
-                    else None
+                    round(market_value_cad, 2) if market_value_cad is not None else None
                 ),
                 "unrealized_pl_cad": (
                     round(unrealized_pl_cad, 2)
                     if unrealized_pl_cad is not None
                     else None
                 ),
+                "implied_fx": round(implied_fx, 6),
                 "is_option": is_opt,
                 "option_details": option_details(symbol_raw) if is_opt else None,
             }

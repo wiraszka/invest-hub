@@ -4,6 +4,7 @@ Revision ID: 0005
 Revises: 0004
 Create Date: 2026-05-21
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -17,10 +18,25 @@ branch_labels = None
 depends_on = None
 
 _FINANCIAL_AMOUNT_COLS = [
-    "revenue", "gross_profit", "operating_income", "net_income", "ebitda",
-    "cash", "total_debt", "net_debt", "total_equity", "total_assets",
-    "operating_cash_flow", "capex", "free_cash_flow", "market_cap",
-    "enterprise_value", "pe_ratio", "ev_ebitda", "price_to_book", "roe",
+    "revenue",
+    "gross_profit",
+    "operating_income",
+    "net_income",
+    "ebitda",
+    "cash",
+    "total_debt",
+    "net_debt",
+    "total_equity",
+    "total_assets",
+    "operating_cash_flow",
+    "capex",
+    "free_cash_flow",
+    "market_cap",
+    "enterprise_value",
+    "pe_ratio",
+    "ev_ebitda",
+    "price_to_book",
+    "roe",
 ]
 
 
@@ -74,21 +90,13 @@ def upgrade() -> None:
         "WHERE transaction_date IS NULL"
     )
     op.execute(
-        "UPDATE transactions SET activity_type = 'Trade' "
-        "WHERE activity_type IS NULL"
+        "UPDATE transactions SET activity_type = 'Trade' WHERE activity_type IS NULL"
     )
     op.execute(
-        "UPDATE transactions SET activity_sub_type = '' "
-        "WHERE activity_sub_type IS NULL"
+        "UPDATE transactions SET activity_sub_type = '' WHERE activity_sub_type IS NULL"
     )
-    op.execute(
-        "UPDATE transactions SET account_type = '' "
-        "WHERE account_type IS NULL"
-    )
-    op.execute(
-        "UPDATE transactions SET currency = 'CAD' "
-        "WHERE currency IS NULL"
-    )
+    op.execute("UPDATE transactions SET account_type = '' WHERE account_type IS NULL")
+    op.execute("UPDATE transactions SET currency = 'CAD' WHERE currency IS NULL")
 
     op.alter_column("transactions", "transaction_date", nullable=False)
     op.alter_column("transactions", "activity_type", nullable=False)
@@ -127,7 +135,9 @@ def upgrade() -> None:
     # analysis_reports — drop surrogate id, promote ticker to primary key
     # -----------------------------------------------------------------------
     op.drop_index("ix_analysis_reports_ticker", table_name="analysis_reports")
-    op.drop_constraint("analysis_reports_ticker_key", "analysis_reports", type_="unique")
+    op.drop_constraint(
+        "analysis_reports_ticker_key", "analysis_reports", type_="unique"
+    )
     op.drop_constraint("analysis_reports_pkey", "analysis_reports", type_="primary")
     op.drop_column("analysis_reports", "id")
     op.create_primary_key("analysis_reports_pkey", "analysis_reports", ["ticker"])
@@ -137,8 +147,7 @@ def upgrade() -> None:
         "ALTER COLUMN structured_context SET DEFAULT '{}'::jsonb"
     )
     op.execute(
-        "ALTER TABLE analysis_reports "
-        "ALTER COLUMN chart_data SET DEFAULT '{}'::jsonb"
+        "ALTER TABLE analysis_reports ALTER COLUMN chart_data SET DEFAULT '{}'::jsonb"
     )
 
     # -----------------------------------------------------------------------
@@ -162,9 +171,7 @@ def downgrade() -> None:
     op.execute(
         "ALTER TABLE analysis_reports ALTER COLUMN structured_context DROP DEFAULT"
     )
-    op.execute(
-        "ALTER TABLE analysis_reports ALTER COLUMN chart_data DROP DEFAULT"
-    )
+    op.execute("ALTER TABLE analysis_reports ALTER COLUMN chart_data DROP DEFAULT")
     op.drop_constraint("analysis_reports_pkey", "analysis_reports", type_="primary")
     op.add_column(
         "analysis_reports",
@@ -191,9 +198,7 @@ def downgrade() -> None:
         op.add_column("holdings", sa.Column(col, col_type, nullable=True))
 
     # transactions
-    op.execute(
-        "ALTER TABLE transactions DROP CONSTRAINT ck_transactions_activity_type"
-    )
+    op.execute("ALTER TABLE transactions DROP CONSTRAINT ck_transactions_activity_type")
     op.alter_column("transactions", "transaction_date", nullable=True)
     op.alter_column("transactions", "activity_type", nullable=True)
     op.alter_column("transactions", "activity_sub_type", nullable=True)
@@ -222,6 +227,4 @@ def downgrade() -> None:
         ("company_provider_xref", "id"),
         ("companies", "canonical_id"),
     ]:
-        op.execute(
-            f"ALTER TABLE {table} ALTER COLUMN {col} DROP DEFAULT"
-        )
+        op.execute(f"ALTER TABLE {table} ALTER COLUMN {col} DROP DEFAULT")

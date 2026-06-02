@@ -31,16 +31,24 @@ class OpenFIGIAdapter:
         fetched_at = datetime.now(timezone.utc)
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                response = await client.post(_OPENFIGI_URL, json=payload, headers=headers)
+                response = await client.post(
+                    _OPENFIGI_URL, json=payload, headers=headers
+                )
                 if not response.is_success:
                     return ProviderResponse(
-                        data=None, raw={}, provider=self.name, fetched_at=fetched_at,
+                        data=None,
+                        raw={},
+                        provider=self.name,
+                        fetched_at=fetched_at,
                         error=f"OpenFIGI returned {response.status_code}",
                     )
                 raw = response.json()
                 if not raw or not raw[0].get("data"):
                     return ProviderResponse(
-                        data=None, raw={}, provider=self.name, fetched_at=fetched_at,
+                        data=None,
+                        raw={},
+                        provider=self.name,
+                        fetched_at=fetched_at,
                         error=f"No FIGI data for {ticker}",
                     )
                 entry = raw[0]["data"][0]
@@ -50,7 +58,15 @@ class OpenFIGIAdapter:
                     exchange=entry.get("exchCode"),
                     currency=entry.get("marketSector"),
                 )
-                return ProviderResponse(data=identity, raw=entry, provider=self.name, fetched_at=fetched_at)
+                return ProviderResponse(
+                    data=identity, raw=entry, provider=self.name, fetched_at=fetched_at
+                )
         except Exception as exc:
             logger.exception("openfigi lookup error", extra={"ticker": ticker})
-            return ProviderResponse(data=None, raw={}, provider=self.name, fetched_at=fetched_at, error=str(exc))
+            return ProviderResponse(
+                data=None,
+                raw={},
+                provider=self.name,
+                fetched_at=fetched_at,
+                error=str(exc),
+            )

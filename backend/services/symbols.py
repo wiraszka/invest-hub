@@ -19,8 +19,18 @@ def option_details(raw: str) -> str:
         return ""
     yy, mm, dd, pc, strike_raw = match.groups()
     months = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
     ]
     month = months[int(mm) - 1]
     strike = int(strike_raw) / 1000

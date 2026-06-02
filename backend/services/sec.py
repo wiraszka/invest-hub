@@ -133,9 +133,60 @@ def fetch_filing_text(cik_10: str, accession: str, primary_doc: str) -> str:
 
 
 def extract_10k_sections(text: str) -> str:
-    """Extract Items 1, 1A, and 7 from 10-K plain text."""
+    """Extract Items 1, 1A, and 7 from 10-K plain text as a single string.
+
+    Kept for backward compatibility; prefer extract_10k_items() for new code.
+    """
     return _extract_sections(text, _SECTION_PATTERNS)
 
+
+def extract_10k_items(text: str) -> tuple[str, str, str]:
+    """Extract Items 1, 1A, and 7 from 10-K plain text as separate strings.
+
+    Returns (item_1, item_1a, item_7).  Each section is capped at
+    MAX_SECTION_CHARS characters.  Missing sections are returned as "".
+    """
+    _ITEM_PATTERNS = [
+        (re.compile(r"item\s+1\.?\s+business", re.I), "item_1"),
+        (re.compile(r"item\s+1a\.?\s+risk\s+factors", re.I), "item_1a"),
+        (re.compile(r"item\s+7\.?\s+management", re.I), "item_7"),
+    ]
+    sections: dict[str, list[str]] = {}
+    current_key: str | None = None
+    chars_in_section = 0
+
+    for line in text.split("\n"):
+        stripped = line.strip()
+
+        matched_key: str | None = None
+        for pattern, key in _ITEM_PATTERNS:
+            if pattern.match(stripped):
+                matched_key = key
+                break
+
+        if matched_key is not None:
+            current_key = matched_key
+            sections.setdefault(current_key, [])
+            sections[current_key].append(line)
+            chars_in_section = len(line)
+            continue
+
+        if current_key is not None:
+            if _NEXT_ITEM_PATTERN.match(stripped) and not any(
+                p.match(stripped) for p, _ in _ITEM_PATTERNS
+            ):
+                current_key = None
+                chars_in_section = 0
+            else:
+                if chars_in_section < MAX_SECTION_CHARS:
+                    sections[current_key].append(line)
+                    chars_in_section += len(line)
+
+    def _join(key: str) -> str:
+        lines = sections.get(key, [])
+        return "\n".join(lines)[:MAX_SECTION_CHARS]
+
+    return _join("item_1"), _join("item_1a"), _join("item_7")
 
 
 def get_sic_metadata(ticker: str) -> dict | None:
@@ -309,14 +360,18 @@ def _latest_value(
                 if unit_key == "shares":
                     continue
                 filtered = [
-                    e for e in unit_entries if e.get("form") in annual_forms and "end" in e
+                    e
+                    for e in unit_entries
+                    if e.get("form") in annual_forms and "end" in e
                 ]
                 if filtered:
                     entries = filtered
                     break
         else:
             entries = units.get("USD") or units.get("shares") or []
-            entries = [e for e in entries if e.get("form") in annual_forms and "end" in e]
+            entries = [
+                e for e in entries if e.get("form") in annual_forms and "end" in e
+            ]
         if not entries:
             continue
         entries.sort(key=lambda e: e["end"], reverse=True)

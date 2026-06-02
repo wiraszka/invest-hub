@@ -35,12 +35,24 @@ class GoogleTrendsAdapter:
         fetched_at = datetime.now(timezone.utc)
         try:
             result = await asyncio.to_thread(
-                _fetch_sync, commodities, keyword_map, timeframe_label, geo,
+                _fetch_sync,
+                commodities,
+                keyword_map,
+                timeframe_label,
+                geo,
             )
-            return ProviderResponse(data=result, raw={}, provider=self.name, fetched_at=fetched_at)
+            return ProviderResponse(
+                data=result, raw={}, provider=self.name, fetched_at=fetched_at
+            )
         except Exception as exc:
             logger.exception("google_trends fetch error")
-            return ProviderResponse(data=None, raw={}, provider=self.name, fetched_at=fetched_at, error=str(exc))
+            return ProviderResponse(
+                data=None,
+                raw={},
+                provider=self.name,
+                fetched_at=fetched_at,
+                error=str(exc),
+            )
 
 
 def _resolve_timeframe(label: str) -> str:
@@ -114,7 +126,9 @@ def _fetch_sync(
         TrendsPoint(
             commodity=row["Commodity"],
             interest=int(row["Interest"]),
-            momentum=None if pd.isna(row["Momentum"]) else round(float(row["Momentum"]), 1),
+            momentum=None
+            if pd.isna(row["Momentum"])
+            else round(float(row["Momentum"]), 1),
         )
         for _, row in latest_df.iterrows()
     ]
