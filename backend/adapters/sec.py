@@ -36,7 +36,10 @@ class SECAdapter(IMarketDataAdapter):
             try:
                 result = await asyncio.to_thread(_fetch_financials_sync, ticker)
                 return ProviderResponse(
-                    data=result, raw={}, provider=self.name, fetched_at=datetime.now(timezone.utc)
+                    data=result,
+                    raw={},
+                    provider=self.name,
+                    fetched_at=datetime.now(timezone.utc),
                 )
             except Exception as exc:
                 logger.exception("sec get_financials error", extra={"ticker": ticker})
@@ -47,7 +50,10 @@ class SECAdapter(IMarketDataAdapter):
             try:
                 result = await asyncio.to_thread(_fetch_profile_sync, ticker)
                 return ProviderResponse(
-                    data=result, raw={}, provider=self.name, fetched_at=datetime.now(timezone.utc)
+                    data=result,
+                    raw={},
+                    provider=self.name,
+                    fetched_at=datetime.now(timezone.utc),
                 )
             except Exception as exc:
                 logger.exception("sec get_profile error", extra={"ticker": ticker})

@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from adapters.finnhub import FinnhubAdapter
+from adapters.finnhub import FinnhubAdapter, _clean_peers
 from models.market_data import CompanyIdentity, Quote
 
 
@@ -32,7 +32,9 @@ class TestGetQuote:
         assert response.provider == "finnhub"
         assert response.error is None
 
-    async def test_returns_error_when_price_is_zero(self, adapter: FinnhubAdapter) -> None:
+    async def test_returns_error_when_price_is_zero(
+        self, adapter: FinnhubAdapter
+    ) -> None:
         raw_payload = {"c": 0, "h": 0, "l": 0}
 
         with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
@@ -47,7 +49,9 @@ class TestGetQuote:
         assert response.data is None
         assert response.error is not None
 
-    async def test_returns_error_on_none_response(self, adapter: FinnhubAdapter) -> None:
+    async def test_returns_error_on_none_response(
+        self, adapter: FinnhubAdapter
+    ) -> None:
         with patch.object(adapter, "_get", new=AsyncMock(return_value=None)):
             with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
                 mock_client = AsyncMock()
@@ -61,7 +65,9 @@ class TestGetQuote:
         assert response.error is not None
 
     async def test_returns_error_on_exception(self, adapter: FinnhubAdapter) -> None:
-        with patch.object(adapter, "_get", new=AsyncMock(side_effect=RuntimeError("timeout"))):
+        with patch.object(
+            adapter, "_get", new=AsyncMock(side_effect=RuntimeError("timeout"))
+        ):
             with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
                 mock_client = AsyncMock()
                 mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -73,8 +79,11 @@ class TestGetQuote:
         assert response.data is None
         assert response.error is not None
 
-    async def test_returns_error_when_circuit_is_open(self, adapter: FinnhubAdapter) -> None:
+    async def test_returns_error_when_circuit_is_open(
+        self, adapter: FinnhubAdapter
+    ) -> None:
         import time
+
         adapter._circuit._failures = adapter._circuit.failure_threshold
         adapter._circuit._opened_at = time.monotonic()
 
@@ -122,7 +131,9 @@ class TestGetProfile:
         assert response.data.security_type == "eq"
         assert response.error is None
 
-    async def test_normalizes_security_type_to_lowercase(self, adapter: FinnhubAdapter) -> None:
+    async def test_normalizes_security_type_to_lowercase(
+        self, adapter: FinnhubAdapter
+    ) -> None:
         raw_payload = {
             "name": "SPDR S&P 500 ETF",
             "exchange": "NYSE",
@@ -157,7 +168,9 @@ class TestGetProfile:
         assert response.data is None
         assert response.error is not None
 
-    async def test_returns_error_on_none_response(self, adapter: FinnhubAdapter) -> None:
+    async def test_returns_error_on_none_response(
+        self, adapter: FinnhubAdapter
+    ) -> None:
         with patch.object(adapter, "_get", new=AsyncMock(return_value=None)):
             with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
                 mock_client = AsyncMock()
@@ -169,3 +182,103 @@ class TestGetProfile:
 
         assert response.data is None
         assert response.error is not None
+
+
+class TestCleanPeers:
+    def test_removes_exact_self_ticker(self) -> None:
+        result = _clean_peers("MU", ["NVDA", "MU", "AMD", "INTC"])
+
+        assert "MU" not in result
+        assert result == ["NVDA", "AMD", "INTC"]
+
+    def test_removes_cross_listed_self_ticker(self) -> None:
+        result = _clean_peers("AEM", ["ABX.TO", "AEM.TO", "FNV.TO"])
+
+        assert "AEM.TO" not in result
+        assert result == ["ABX.TO", "FNV.TO"]
+
+    def test_deduplicates(self) -> None:
+        result = _clean_peers("MU", ["NVDA", "AMD", "NVDA", "INTC"])
+
+        assert result.count("NVDA") == 1
+
+    def test_caps_at_eight(self) -> None:
+        raw = [f"T{i}" for i in range(20)]
+
+        result = _clean_peers("OTHER", raw)
+
+        assert len(result) == 8
+
+    def test_returns_empty_for_empty_input(self) -> None:
+        result = _clean_peers("MU", [])
+
+        assert result == []
+
+    def test_case_insensitive_self_removal(self) -> None:
+        result = _clean_peers("mu", ["NVDA", "MU", "AMD"])
+
+        assert "MU" not in result
+
+
+class TestGetPeers:
+    async def test_returns_cleaned_peer_list(self, adapter: FinnhubAdapter) -> None:
+        raw_payload = ["NVDA", "AVGO", "MU", "AMD", "INTC"]
+
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=raw_payload)):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                result = await adapter.get_peers("MU")
+
+        assert "MU" not in result
+        assert "NVDA" in result
+        assert isinstance(result, list)
+
+    async def test_returns_empty_list_on_none_response(
+        self, adapter: FinnhubAdapter
+    ) -> None:
+        with patch.object(adapter, "_get", new=AsyncMock(return_value=None)):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                result = await adapter.get_peers("MU")
+
+        assert result == []
+
+    async def test_returns_empty_list_on_exception(
+        self, adapter: FinnhubAdapter
+    ) -> None:
+        with patch.object(
+            adapter, "_get", new=AsyncMock(side_effect=RuntimeError("network error"))
+        ):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                result = await adapter.get_peers("MU")
+
+        assert result == []
+
+    async def test_returns_empty_list_on_non_list_response(
+        self, adapter: FinnhubAdapter
+    ) -> None:
+        with patch.object(
+            adapter, "_get", new=AsyncMock(return_value={"error": "not found"})
+        ):
+            with patch("adapters.finnhub.httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_client.__aexit__ = AsyncMock(return_value=None)
+                mock_client_cls.return_value = mock_client
+
+                result = await adapter.get_peers("MU")
+
+        assert result == []

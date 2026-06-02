@@ -19,7 +19,9 @@ MOCK_HISTORY = {
 
 
 def test_current_price_returns_ticker_and_price():
-    with patch("routers.price.get_current_price", new=AsyncMock(return_value=MOCK_PRICE)):
+    with patch(
+        "routers.price.get_current_price", new=AsyncMock(return_value=MOCK_PRICE)
+    ):
         response = client.get("/api/v1/price/NNE")
 
     assert response.status_code == 200
@@ -29,21 +31,28 @@ def test_current_price_returns_ticker_and_price():
 
 
 def test_current_price_uppercases_ticker():
-    with patch("routers.price.get_current_price", new=AsyncMock(return_value=MOCK_PRICE)) as mock:
-        client.get("/api/v1/price/nne")
+    with patch(
+        "routers.price.get_current_price", new=AsyncMock(return_value=MOCK_PRICE)
+    ) as mock:
+        client.get("/api/v1/price/NNE")
 
     mock.assert_called_once_with("NNE")
 
 
 def test_current_price_returns_404_on_invalid_ticker():
-    with patch("routers.price.get_current_price", new=AsyncMock(side_effect=ValueError("Not found"))):
+    with patch(
+        "routers.price.get_current_price",
+        new=AsyncMock(side_effect=ValueError("Not found")),
+    ):
         response = client.get("/api/v1/price/INVALID")
 
     assert response.status_code == 404
 
 
 def test_price_history_returns_ticker_and_history():
-    with patch("routers.price.get_price_history", new=AsyncMock(return_value=MOCK_HISTORY)):
+    with patch(
+        "routers.price.get_price_history", new=AsyncMock(return_value=MOCK_HISTORY)
+    ):
         response = client.get("/api/v1/price/NNE/history")
 
     assert response.status_code == 200
@@ -54,7 +63,10 @@ def test_price_history_returns_ticker_and_history():
 
 
 def test_price_history_returns_404_on_invalid_ticker():
-    with patch("routers.price.get_price_history", new=AsyncMock(side_effect=ValueError("Not found"))):
+    with patch(
+        "routers.price.get_price_history",
+        new=AsyncMock(side_effect=ValueError("Not found")),
+    ):
         response = client.get("/api/v1/price/INVALID/history")
 
     assert response.status_code == 404
@@ -71,7 +83,13 @@ async def test_get_current_price_returns_twelvedata_price_when_available():
 
     from models.market_data import Quote
 
-    mock_quote = Quote(symbol="NNE", price=18.42, currency="USD", source="twelvedata", fetched_at=datetime.now(timezone.utc))
+    mock_quote = Quote(
+        symbol="NNE",
+        price=18.42,
+        currency="USD",
+        source="twelvedata",
+        fetched_at=datetime.now(timezone.utc),
+    )
     mock_adapter = MagicMock()
     mock_adapter.get_quote = AsyncMock(
         return_value=type("R", (), {"data": mock_quote, "error": None})()
@@ -92,7 +110,13 @@ async def test_get_current_price_falls_back_to_fmp_when_twelvedata_fails():
 
     from models.market_data import Quote
 
-    mock_quote = Quote(symbol="NNE", price=42.50, currency="USD", source="fmp", fetched_at=datetime.now(timezone.utc))
+    mock_quote = Quote(
+        symbol="NNE",
+        price=42.50,
+        currency="USD",
+        source="fmp",
+        fetched_at=datetime.now(timezone.utc),
+    )
     mock_td = MagicMock()
     mock_td.get_quote = AsyncMock(
         return_value=type("R", (), {"data": None, "error": "TD down"})()
@@ -117,7 +141,13 @@ async def test_get_current_price_includes_currency_from_quote():
 
     from models.market_data import Quote
 
-    mock_quote = Quote(symbol="SU.TO", price=55.10, currency="CAD", source="twelvedata", fetched_at=datetime.now(timezone.utc))
+    mock_quote = Quote(
+        symbol="SU.TO",
+        price=55.10,
+        currency="CAD",
+        source="twelvedata",
+        fetched_at=datetime.now(timezone.utc),
+    )
     mock_adapter = MagicMock()
     mock_adapter.get_quote = AsyncMock(
         return_value=type("R", (), {"data": mock_quote, "error": None})()

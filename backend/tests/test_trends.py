@@ -36,7 +36,8 @@ def test_trends_rejects_unknown_timeframe():
 def test_trends_returns_cached_result():
     with (
         patch(
-            "routers.trends.get_trends_cache", new=AsyncMock(return_value=MOCK_TRENDS_DATA)
+            "routers.trends.get_trends_cache",
+            new=AsyncMock(return_value=MOCK_TRENDS_DATA),
         ) as mock_cache,
         patch("routers.trends.fetch_trends_data", new=AsyncMock()) as mock_fetch,
     ):
@@ -52,7 +53,8 @@ def test_trends_fetches_and_caches_on_miss():
     with (
         patch("routers.trends.get_trends_cache", new=AsyncMock(return_value=None)),
         patch(
-            "routers.trends.fetch_trends_data", new=AsyncMock(return_value=MOCK_TRENDS_DATA)
+            "routers.trends.fetch_trends_data",
+            new=AsyncMock(return_value=MOCK_TRENDS_DATA),
         ) as mock_fetch,
         patch("routers.trends.upsert_trends_cache", new=AsyncMock()) as mock_upsert,
     ):

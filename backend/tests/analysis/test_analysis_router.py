@@ -34,7 +34,6 @@ def _make_data() -> AnalysisData:
         currency="USD",
         sector="Technology",
         industry="Software",
-        financials={"metrics_block": "Revenue: $1.00B", "filing_excerpt": "Annual report."},
         template_key="general",
         generated_at=datetime.now(timezone.utc),
     )
@@ -66,7 +65,10 @@ def client():
 
 class TestGetAnalysisData:
     async def test_returns_cached_data(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.get_cached_data", new=AsyncMock(return_value=_make_data())):
+        with patch(
+            "routers.analysis.analysis.get_cached_data",
+            new=AsyncMock(return_value=_make_data()),
+        ):
             async with client as c:
                 response = await c.get("/api/v1/analysis/AAPL/data")
 
@@ -74,17 +76,22 @@ class TestGetAnalysisData:
         body = response.json()
         assert body["ticker"] == "AAPL"
         assert body["company_name"] == "Apple Inc."
-        assert "financials" in body
+        assert body["template_key"] == "general"
 
     async def test_returns_404_when_no_data(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.get_cached_data", new=AsyncMock(return_value=None)):
+        with patch(
+            "routers.analysis.analysis.get_cached_data",
+            new=AsyncMock(return_value=None),
+        ):
             async with client as c:
                 response = await c.get("/api/v1/analysis/AAPL/data")
 
         assert response.status_code == 404
         assert response.json()["detail"]["code"] == "DATA_NOT_FOUND"
 
-    async def test_lowercase_ticker_rejected_by_path_validation(self, client: AsyncClient) -> None:
+    async def test_lowercase_ticker_rejected_by_path_validation(
+        self, client: AsyncClient
+    ) -> None:
         async with client as c:
             response = await c.get("/api/v1/analysis/aapl/data")
 
@@ -93,17 +100,23 @@ class TestGetAnalysisData:
 
 class TestPostAnalysisData:
     async def test_returns_generated_data(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_data", new=AsyncMock(return_value=_make_data())):
+        with patch(
+            "routers.analysis.analysis.run_providers",
+            new=AsyncMock(return_value=_make_data()),
+        ):
             async with client as c:
                 response = await c.post("/api/v1/analysis/AAPL/data")
 
         assert response.status_code == 200
         assert response.json()["ticker"] == "AAPL"
 
-    async def test_returns_503_on_provider_unavailable(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_data", new=AsyncMock(
-            side_effect=ProviderUnavailableError("AAPL", [])
-        )):
+    async def test_returns_503_on_provider_unavailable(
+        self, client: AsyncClient
+    ) -> None:
+        with patch(
+            "routers.analysis.analysis.run_providers",
+            new=AsyncMock(side_effect=ProviderUnavailableError("AAPL", [])),
+        ):
             async with client as c:
                 response = await c.post("/api/v1/analysis/AAPL/data")
 
@@ -111,9 +124,10 @@ class TestPostAnalysisData:
         assert response.json()["detail"]["code"] == "PROVIDER_UNAVAILABLE"
 
     async def test_returns_502_on_unexpected_error(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_data", new=AsyncMock(
-            side_effect=RuntimeError("something exploded")
-        )):
+        with patch(
+            "routers.analysis.analysis.run_providers",
+            new=AsyncMock(side_effect=RuntimeError("something exploded")),
+        ):
             async with client as c:
                 response = await c.post("/api/v1/analysis/AAPL/data")
 
@@ -129,7 +143,10 @@ class TestPostAnalysisData:
 
 class TestGetAnalysisReport:
     async def test_returns_cached_report(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.get_cached_report", new=AsyncMock(return_value=_make_report())):
+        with patch(
+            "routers.analysis.analysis.get_cached_report",
+            new=AsyncMock(return_value=_make_report()),
+        ):
             async with client as c:
                 response = await c.get("/api/v1/analysis/AAPL/report")
 
@@ -139,7 +156,10 @@ class TestGetAnalysisReport:
         assert "report_markdown" in body
 
     async def test_returns_404_when_no_report(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.get_cached_report", new=AsyncMock(return_value=None)):
+        with patch(
+            "routers.analysis.analysis.get_cached_report",
+            new=AsyncMock(return_value=None),
+        ):
             async with client as c:
                 response = await c.get("/api/v1/analysis/AAPL/report")
 
@@ -149,26 +169,40 @@ class TestGetAnalysisReport:
 
 class TestPostAnalysisReport:
     async def test_returns_generated_report(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_report", new=AsyncMock(return_value=_make_report())):
+        with patch(
+            "routers.analysis.analysis.run_report",
+            new=AsyncMock(return_value=_make_report()),
+        ):
             async with client as c:
                 response = await c.post("/api/v1/analysis/AAPL/report")
 
         assert response.status_code == 200
-        assert response.json()["report_markdown"] == "### Company Snapshot\n- Apple makes iPhones."
+        assert (
+            response.json()["report_markdown"]
+            == "### Company Snapshot\n- Apple makes iPhones."
+        )
 
-    async def test_returns_503_on_provider_unavailable(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_report", new=AsyncMock(
-            side_effect=ProviderUnavailableError("AAPL", [])
-        )):
+    async def test_returns_503_on_provider_unavailable(
+        self, client: AsyncClient
+    ) -> None:
+        with patch(
+            "routers.analysis.analysis.run_report",
+            new=AsyncMock(side_effect=ProviderUnavailableError("AAPL", [])),
+        ):
             async with client as c:
                 response = await c.post("/api/v1/analysis/AAPL/report")
 
         assert response.status_code == 503
 
-    async def test_returns_422_on_classification_error(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_report", new=AsyncMock(
-            side_effect=ValueError("analyzer failed to classify company")
-        )):
+    async def test_returns_422_on_classification_error(
+        self, client: AsyncClient
+    ) -> None:
+        with patch(
+            "routers.analysis.analysis.run_report",
+            new=AsyncMock(
+                side_effect=ValueError("analyzer failed to classify company")
+            ),
+        ):
             async with client as c:
                 response = await c.post("/api/v1/analysis/AAPL/report")
 
@@ -176,7 +210,10 @@ class TestPostAnalysisReport:
         assert response.json()["detail"]["code"] == "CLASSIFICATION_ERROR"
 
     async def test_force_param_is_passed_through(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_report", new=AsyncMock(return_value=_make_report())) as mock:
+        with patch(
+            "routers.analysis.analysis.run_report",
+            new=AsyncMock(return_value=_make_report()),
+        ) as mock:
             async with client as c:
                 await c.post("/api/v1/analysis/AAPL/report?force=true")
 
@@ -186,7 +223,10 @@ class TestPostAnalysisReport:
 
 class TestGetAnalysisResult:
     async def test_returns_cached_result(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.get_cached_analyze", new=AsyncMock(return_value=_make_analyze_result())):
+        with patch(
+            "routers.analysis.analysis.get_cached_analyze",
+            new=AsyncMock(return_value=_make_analyze_result()),
+        ):
             async with client as c:
                 response = await c.get("/api/v1/analysis/AAPL/analyze")
 
@@ -197,7 +237,10 @@ class TestGetAnalysisResult:
         assert "chart_data" in body
 
     async def test_returns_404_when_no_result(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.get_cached_analyze", new=AsyncMock(return_value=None)):
+        with patch(
+            "routers.analysis.analysis.get_cached_analyze",
+            new=AsyncMock(return_value=None),
+        ):
             async with client as c:
                 response = await c.get("/api/v1/analysis/AAPL/analyze")
 
@@ -207,7 +250,10 @@ class TestGetAnalysisResult:
 
 class TestPostAnalysisResult:
     async def test_returns_generated_result(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_analyze", new=AsyncMock(return_value=_make_analyze_result())):
+        with patch(
+            "routers.analysis.analysis.run_analyze",
+            new=AsyncMock(return_value=_make_analyze_result()),
+        ):
             async with client as c:
                 response = await c.post("/api/v1/analysis/AAPL/analyze")
 
@@ -216,10 +262,13 @@ class TestPostAnalysisResult:
         assert body["ticker"] == "AAPL"
         assert body["independence"] == "independent"
 
-    async def test_returns_503_on_provider_unavailable(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_analyze", new=AsyncMock(
-            side_effect=ProviderUnavailableError("AAPL", [])
-        )):
+    async def test_returns_503_on_provider_unavailable(
+        self, client: AsyncClient
+    ) -> None:
+        with patch(
+            "routers.analysis.analysis.run_analyze",
+            new=AsyncMock(side_effect=ProviderUnavailableError("AAPL", [])),
+        ):
             async with client as c:
                 response = await c.post("/api/v1/analysis/AAPL/analyze")
 
@@ -227,9 +276,10 @@ class TestPostAnalysisResult:
         assert response.json()["detail"]["code"] == "PROVIDER_UNAVAILABLE"
 
     async def test_returns_502_on_unexpected_error(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_analyze", new=AsyncMock(
-            side_effect=RuntimeError("something exploded")
-        )):
+        with patch(
+            "routers.analysis.analysis.run_analyze",
+            new=AsyncMock(side_effect=RuntimeError("something exploded")),
+        ):
             async with client as c:
                 response = await c.post("/api/v1/analysis/AAPL/analyze")
 
@@ -237,7 +287,10 @@ class TestPostAnalysisResult:
         assert response.json()["detail"]["code"] == "PIPELINE_ERROR"
 
     async def test_force_param_is_passed_through(self, client: AsyncClient) -> None:
-        with patch("routers.analysis.analysis.run_analyze", new=AsyncMock(return_value=_make_analyze_result())) as mock:
+        with patch(
+            "routers.analysis.analysis.run_analyze",
+            new=AsyncMock(return_value=_make_analyze_result()),
+        ) as mock:
             async with client as c:
                 await c.post("/api/v1/analysis/AAPL/analyze?force=true")
 

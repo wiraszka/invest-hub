@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import React, { useState } from "react";
 import { canonicalTicker } from "./ChartsSection";
 import type { SymbolMetadata } from "./ChartsSection";
 
@@ -25,6 +25,7 @@ export interface Position {
   market_price_currency?: string;
   market_value_cad?: number;
   unrealized_pl_cad?: number;
+  implied_fx?: number;
 }
 
 export type AnalysisStatus = "idle" | "loading" | "done" | "error";
@@ -47,12 +48,12 @@ export const ALL_COLUMN_DEFS: ColumnDef[] = [
   { key: "avg_cost_per_share", label: "Avg Cost" },
   { key: "cost_basis", label: "Cost Basis" },
   { key: "market_price", label: "Mkt Price" },
-  { key: "market_value_cad", label: "Mkt Value" },
-  { key: "unrealized_pl", label: "Unreal. P/L" },
+  { key: "market_value_cad", label: "Mkt Value (CAD)" },
+  { key: "unrealized_pl", label: "Unreal. P/L (CAD)" },
   { key: "unrealized_pct", label: "Unreal. %" },
   { key: "realized_pl", label: "Realized P/L" },
   { key: "dividends", label: "Dividends" },
-  { key: "total_return", label: "Total Return" },
+  { key: "total_return", label: "Total Return (CAD)" },
   { key: "total_return_pct", label: "Total %" },
   { key: "portfolio_weight", label: "Weight %" },
 ];
@@ -78,39 +79,92 @@ export const DEFAULT_VISIBLE_COLUMNS: string[] = [
   "portfolio_weight",
 ];
 
-type SortKey = keyof Pick<
-  Position,
+type SortKey =
   | "account"
   | "name"
   | "symbol"
   | "asset_type"
+  | "exchange"
   | "shares_held"
   | "avg_cost_per_share"
   | "cost_basis"
+  | "market_price"
+  | "market_value_cad"
+  | "unrealized_pl"
+  | "unrealized_pct"
   | "realized_pl"
->;
+  | "dividends"
+  | "total_return"
+  | "total_return_pct"
+  | "portfolio_weight";
 type SortDir = "asc" | "desc";
 
-interface SortableColDef {
-  key: SortKey;
-  label: string;
-  numeric: boolean;
-  className?: string;
+const NUMERIC_SORT_KEYS = new Set<SortKey>([
+  "shares_held",
+  "avg_cost_per_share",
+  "cost_basis",
+  "market_price",
+  "market_value_cad",
+  "unrealized_pl",
+  "unrealized_pct",
+  "realized_pl",
+  "dividends",
+  "total_return",
+  "total_return_pct",
+  "portfolio_weight",
+]);
+
+interface RowData {
+  pos: Position;
+  cticker: string;
+  posKey: string;
+  isLink: boolean;
+  status: AnalysisStatus;
+  unrealPct: number | null;
+  totalReturn: number;
+  totalReturnPct: number | null;
+  portfolioWeight: number | null;
 }
 
-const COLS_LEFT: SortableColDef[] = [
-  { key: "account", label: "Account", numeric: false, className: "w-24" },
-  { key: "name", label: "Name", numeric: false, className: "w-48" },
-  { key: "symbol", label: "Symbol", numeric: false, className: "w-20" },
-  { key: "asset_type", label: "Type", numeric: false, className: "w-24" },
-];
-
-const COLS_RIGHT: SortableColDef[] = [
-  { key: "shares_held", label: "Shares", numeric: true },
-  { key: "avg_cost_per_share", label: "Avg Cost", numeric: true },
-  { key: "cost_basis", label: "Cost Basis", numeric: true },
-  { key: "realized_pl", label: "Realized P/L", numeric: true },
-];
+function getSortValue(row: RowData, key: SortKey): string | number | null {
+  const p = row.pos;
+  switch (key) {
+    case "account":
+      return p.account;
+    case "name":
+      return p.name || p.symbol;
+    case "symbol":
+      return p.symbol;
+    case "asset_type":
+      return p.asset_type;
+    case "exchange":
+      return p.exchange ?? null;
+    case "shares_held":
+      return p.shares_held;
+    case "avg_cost_per_share":
+      return p.avg_cost_per_share;
+    case "cost_basis":
+      return p.cost_basis;
+    case "market_price":
+      return p.market_price ?? null;
+    case "market_value_cad":
+      return p.market_value_cad ?? null;
+    case "unrealized_pl":
+      return p.unrealized_pl_cad ?? null;
+    case "unrealized_pct":
+      return row.unrealPct;
+    case "realized_pl":
+      return p.realized_pl;
+    case "dividends":
+      return p.dividends;
+    case "total_return":
+      return row.totalReturn;
+    case "total_return_pct":
+      return row.totalReturnPct;
+    case "portfolio_weight":
+      return row.portfolioWeight;
+  }
+}
 
 interface Props {
   positions: Position[];
@@ -210,10 +264,10 @@ export default function PositionsTable({
   const visSet = new Set(visibleColumns ?? DEFAULT_VISIBLE_COLUMNS);
   const isVisible = (col: string) => visSet.has(col);
 
-  function handleSort(key: SortKey, numeric: boolean) {
+  function handleSort(key: SortKey) {
     if (sortKey !== key) {
       setSortKey(key);
-      setSortDir(numeric ? "desc" : "asc");
+      setSortDir(NUMERIC_SORT_KEYS.has(key) ? "desc" : "asc");
       setSortClicks(1);
     } else {
       const next = sortClicks + 1;
@@ -226,10 +280,52 @@ export default function PositionsTable({
     }
   }
 
-  const sorted = [...positions].sort((a, b) => {
+  const totalMarketValue = positions.reduce(
+    (sum, p) => sum + (p.market_value_cad ?? 0),
+    0,
+  );
+
+  const rows: RowData[] = positions.map((p) => {
+    const cticker =
+      resolvedCanonicals[p.symbol] ??
+      canonicalTicker(p.symbol, p.exchange) ??
+      p.symbol;
+    const posKey = `${p.account}::${p.symbol}`;
+    const fx = p.implied_fx ?? 1;
+    const unrealPct =
+      p.unrealized_pl_cad != null && p.cost_basis > 0
+        ? (p.unrealized_pl_cad / (p.cost_basis * fx)) * 100
+        : null;
+    const totalReturn =
+      (p.unrealized_pl_cad ?? 0) + p.realized_pl * fx + p.dividends * fx;
+    const totalReturnPct =
+      p.market_price != null && p.avg_cost_per_share > 0
+        ? ((p.market_price - p.avg_cost_per_share) / p.avg_cost_per_share) * 100
+        : null;
+    const portfolioWeight =
+      totalMarketValue > 0 && p.market_value_cad != null
+        ? (p.market_value_cad / totalMarketValue) * 100
+        : null;
+    return {
+      pos: p,
+      cticker,
+      posKey,
+      isLink: analyzedTickers.has(cticker),
+      status: analysisStatus[cticker] ?? "idle",
+      unrealPct,
+      totalReturn,
+      totalReturnPct,
+      portfolioWeight,
+    };
+  });
+
+  const sortedRows = [...rows].sort((a, b) => {
     if (!sortKey) return 0;
-    const av = a[sortKey];
-    const bv = b[sortKey];
+    const av = getSortValue(a, sortKey);
+    const bv = getSortValue(b, sortKey);
+    if (av === null && bv === null) return 0;
+    if (av === null) return 1;
+    if (bv === null) return -1;
     const cmp =
       typeof av === "string"
         ? av.localeCompare(bv as string)
@@ -237,20 +333,38 @@ export default function PositionsTable({
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  function indicator(key: SortKey) {
-    if (sortKey !== key) return null;
+  function SortTh({
+    col,
+    label,
+    className,
+  }: {
+    col: SortKey;
+    label: React.ReactNode;
+    className?: string;
+  }) {
+    const numeric = NUMERIC_SORT_KEYS.has(col);
     return (
-      <span className="ml-1 opacity-60">{sortDir === "asc" ? "↑" : "↓"}</span>
+      <th
+        className={`px-4 py-3 ${numeric ? "text-right" : ""} ${className ?? ""}`}
+      >
+        <button
+          onClick={() => handleSort(col)}
+          className={`inline-flex items-center gap-0.5 hover:text-neutral-300 ${
+            sortKey === col ? "text-neutral-300" : ""
+          } ${numeric ? "ml-auto" : ""}`}
+        >
+          {label}
+          {sortKey === col && (
+            <span className="ml-1 opacity-60">
+              {sortDir === "asc" ? "↑" : "↓"}
+            </span>
+          )}
+        </button>
+      </th>
     );
   }
 
-  const totalMarketValue = positions.reduce(
-    (sum, p) => sum + (p.market_value_cad ?? 0),
-    0,
-  );
   const showStatusColumn = Object.keys(analysisStatus).length > 0;
-  const visibleLeft = COLS_LEFT.filter((c) => isVisible(c.key));
-  const visibleRight = COLS_RIGHT.filter((c) => isVisible(c.key));
 
   if (positions.length === 0) {
     return (
@@ -263,24 +377,20 @@ export default function PositionsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-neutral-800 text-left text-xs text-neutral-500">
-            {visibleLeft.map(({ key, label, numeric, className }) => (
-              <th
-                key={key}
-                className={`px-4 py-3 ${numeric ? "text-right" : ""} ${className ?? ""}`}
-              >
-                <button
-                  onClick={() => handleSort(key, numeric)}
-                  className={`inline-flex items-center gap-0.5 hover:text-neutral-300 ${
-                    sortKey === key ? "text-neutral-300" : ""
-                  } ${numeric ? "ml-auto" : ""}`}
-                >
-                  {label}
-                  {indicator(key)}
-                </button>
-              </th>
-            ))}
+            {isVisible("account") && (
+              <SortTh col="account" label="Account" className="w-24" />
+            )}
+            {isVisible("name") && (
+              <SortTh col="name" label="Name" className="w-48" />
+            )}
+            {isVisible("symbol") && (
+              <SortTh col="symbol" label="Symbol" className="w-20" />
+            )}
+            {isVisible("asset_type") && (
+              <SortTh col="asset_type" label="Type" className="w-24" />
+            )}
             {isVisible("exchange") && (
-              <th className="w-24 px-4 py-3 text-neutral-500">Exchange</th>
+              <SortTh col="exchange" label="Exchange" className="w-24" />
             )}
             {isVisible("sector") && (
               <th className="w-32 px-4 py-3 text-neutral-500">Sector</th>
@@ -291,85 +401,85 @@ export default function PositionsTable({
             {isVisible("grouping") && (
               <th className="w-32 px-4 py-3 text-neutral-500">Grouping</th>
             )}
-            {visibleRight.map(({ key, label, numeric, className }) => (
-              <th
-                key={key}
-                className={`px-4 py-3 ${numeric ? "text-right" : ""} ${className ?? ""}`}
-              >
-                <button
-                  onClick={() => handleSort(key, numeric)}
-                  className={`inline-flex items-center gap-0.5 hover:text-neutral-300 ${
-                    sortKey === key ? "text-neutral-300" : ""
-                  } ${numeric ? "ml-auto" : ""}`}
-                >
-                  {label}
-                  {indicator(key)}
-                </button>
-              </th>
-            ))}
+            {isVisible("shares_held") && (
+              <SortTh col="shares_held" label="Shares" />
+            )}
+            {isVisible("avg_cost_per_share") && (
+              <SortTh col="avg_cost_per_share" label="Avg Cost" />
+            )}
+            {isVisible("cost_basis") && (
+              <SortTh col="cost_basis" label="Cost Basis" />
+            )}
+            {isVisible("realized_pl") && (
+              <SortTh col="realized_pl" label="Realized P/L" />
+            )}
             {isVisible("market_price") && (
-              <th className="px-4 py-3 text-right text-neutral-500">
-                Mkt Price
-              </th>
+              <SortTh col="market_price" label="Mkt Price" />
             )}
             {isVisible("market_value_cad") && (
-              <th className="px-4 py-3 text-right text-neutral-500">
-                Mkt Value
-              </th>
+              <SortTh
+                col="market_value_cad"
+                label={
+                  <>
+                    Mkt Value
+                    <br />
+                    <span className="text-neutral-600">(CAD)</span>
+                  </>
+                }
+              />
             )}
             {isVisible("unrealized_pl") && (
-              <th className="px-4 py-3 text-right text-neutral-500">
-                Unreal. P/L
-              </th>
+              <SortTh
+                col="unrealized_pl"
+                label={
+                  <>
+                    Unreal. P/L
+                    <br />
+                    <span className="text-neutral-600">(CAD)</span>
+                  </>
+                }
+              />
             )}
             {isVisible("unrealized_pct") && (
-              <th className="px-4 py-3 text-right text-neutral-500">
-                Unreal. %
-              </th>
+              <SortTh col="unrealized_pct" label="Unreal. %" />
             )}
             {isVisible("dividends") && (
-              <th className="px-4 py-3 text-right text-neutral-500">
-                Dividends
-              </th>
+              <SortTh col="dividends" label="Dividends" />
             )}
             {isVisible("total_return") && (
-              <th className="px-4 py-3 text-right text-neutral-500">
-                Total Return
-              </th>
+              <SortTh
+                col="total_return"
+                label={
+                  <>
+                    Total Return
+                    <br />
+                    <span className="text-neutral-600">(CAD)</span>
+                  </>
+                }
+              />
             )}
             {isVisible("total_return_pct") && (
-              <th className="px-4 py-3 text-right text-neutral-500">Total %</th>
+              <SortTh col="total_return_pct" label="Total %" />
             )}
             {isVisible("portfolio_weight") && (
-              <th className="px-4 py-3 text-right text-neutral-500">
-                Weight %
-              </th>
+              <SortTh col="portfolio_weight" label="Weight %" />
             )}
             {showStatusColumn && <th className="w-8 px-4 py-3" />}
           </tr>
         </thead>
         <tbody>
-          {sorted.map((p, i) => {
-            const cticker =
-              resolvedCanonicals[p.symbol] ??
-              canonicalTicker(p.symbol, p.exchange) ??
-              p.symbol;
-            const posKey = `${p.account}::${p.symbol}`;
-            const isLink = analyzedTickers.has(cticker);
-            const status = analysisStatus[cticker] ?? "idle";
-
-            const unrealPct =
-              p.unrealized_pl_cad != null && p.cost_basis > 0
-                ? (p.unrealized_pl_cad / p.cost_basis) * 100
-                : null;
-            const totalReturn =
-              (p.unrealized_pl_cad ?? 0) + p.realized_pl + p.dividends;
-            const totalReturnPct =
-              p.cost_basis > 0 ? (totalReturn / p.cost_basis) * 100 : null;
-            const portfolioWeight =
-              totalMarketValue > 0 && p.market_value_cad != null
-                ? (p.market_value_cad / totalMarketValue) * 100
-                : null;
+          {sortedRows.map((row, i) => {
+            const {
+              pos: p,
+              cticker,
+              posKey,
+              isLink,
+              status,
+              unrealPct,
+              totalReturn,
+              totalReturnPct,
+              portfolioWeight,
+            } = row;
 
             return (
               <tr
@@ -474,26 +584,42 @@ export default function PositionsTable({
                 )}
                 {isVisible("avg_cost_per_share") && (
                   <td className="px-4 py-3 text-right text-neutral-200">
-                    ${fmt(p.avg_cost_per_share, 4)}
+                    ${fmt(p.avg_cost_per_share, 4)}{" "}
+                    <span className="text-xs text-neutral-500">
+                      {p.currency}
+                    </span>
                   </td>
                 )}
                 {isVisible("cost_basis") && (
                   <td className="px-4 py-3 text-right text-neutral-200">
-                    ${fmt(p.cost_basis)}
+                    ${fmt(p.cost_basis)}{" "}
+                    <span className="text-xs text-neutral-500">
+                      {p.currency}
+                    </span>
                   </td>
                 )}
                 {isVisible("realized_pl") && (
                   <td
                     className={`px-4 py-3 text-right ${plClass(p.realized_pl)}`}
                   >
-                    {plPrefix(p.realized_pl)}${fmt(p.realized_pl)}
+                    {plPrefix(p.realized_pl)}${fmt(p.realized_pl)}{" "}
+                    <span className="text-xs text-neutral-500">
+                      {p.currency}
+                    </span>
                   </td>
                 )}
                 {isVisible("market_price") && (
                   <td className="px-4 py-3 text-right text-neutral-200">
-                    {p.market_price != null
-                      ? `$${fmt(p.market_price, 2)}${p.market_price_currency === "USD" ? " USD" : ""}`
-                      : "—"}
+                    {p.market_price != null ? (
+                      <>
+                        ${fmt(p.market_price, 2)}{" "}
+                        <span className="text-xs text-neutral-500">
+                          {p.market_price_currency ?? p.currency}
+                        </span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 )}
                 {isVisible("market_value_cad") && (
@@ -523,7 +649,10 @@ export default function PositionsTable({
                 )}
                 {isVisible("dividends") && (
                   <td className="px-4 py-3 text-right text-neutral-200">
-                    ${fmt(p.dividends)}
+                    ${fmt(p.dividends)}{" "}
+                    <span className="text-xs text-neutral-500">
+                      {p.currency}
+                    </span>
                   </td>
                 )}
                 {isVisible("total_return") && (

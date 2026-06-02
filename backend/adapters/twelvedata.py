@@ -54,16 +54,25 @@ class TwelveDataAdapter(IMarketDataAdapter):
                 async with httpx.AsyncClient(timeout=10) as client:
                     response = await client.get(
                         f"{_BASE}/price",
-                        params={"symbol": _normalize_ticker(ticker), "apikey": settings.td_api_key},
+                        params={
+                            "symbol": _normalize_ticker(ticker),
+                            "apikey": settings.td_api_key,
+                        },
                     )
                     if not response.is_success:
                         self._circuit.record_failure()
-                        return self.error_response(f"TwelveData returned {response.status_code}")
+                        return self.error_response(
+                            f"TwelveData returned {response.status_code}"
+                        )
                     raw = response.json()
                     if "price" not in raw:
                         self._circuit.record_failure()
-                        logger.warning("twelvedata quote empty", extra={"ticker": ticker})
-                        return self.error_response(raw.get("message", f"No price for {ticker}"))
+                        logger.warning(
+                            "twelvedata quote empty", extra={"ticker": ticker}
+                        )
+                        return self.error_response(
+                            raw.get("message", f"No price for {ticker}")
+                        )
                     quote = Quote(
                         symbol=ticker,
                         price=float(raw["price"]),
@@ -72,13 +81,17 @@ class TwelveDataAdapter(IMarketDataAdapter):
                         fetched_at=self.now(),
                     )
                     self._circuit.record_success()
-                    return ProviderResponse(data=quote, raw=raw, provider=self.name, fetched_at=self.now())
+                    return ProviderResponse(
+                        data=quote, raw=raw, provider=self.name, fetched_at=self.now()
+                    )
             except Exception as exc:
                 self._circuit.record_failure()
                 logger.exception("twelvedata get_quote error", extra={"ticker": ticker})
                 return self.error_response(str(exc))
 
-    async def get_price_history(self, ticker: str, days: int = 365, interval: str = "1day") -> ProviderResponse[PriceHistory]:
+    async def get_price_history(
+        self, ticker: str, days: int = 365, interval: str = "1day"
+    ) -> ProviderResponse[PriceHistory]:
         try:
             self._circuit.check()
         except CircuitOpenError as exc:
@@ -87,6 +100,7 @@ class TwelveDataAdapter(IMarketDataAdapter):
         async with self._semaphore:
             try:
                 from datetime import date, timedelta
+
                 start_date = (date.today() - timedelta(days=days)).strftime("%Y-%m-%d")
                 end_date = date.today().strftime("%Y-%m-%d")
                 async with httpx.AsyncClient(timeout=15) as client:
@@ -104,19 +118,27 @@ class TwelveDataAdapter(IMarketDataAdapter):
                     raw = response.json()
                     if "values" not in raw:
                         self._circuit.record_failure()
-                        return self.error_response(raw.get("message", "Unexpected response from TwelveData"))
+                        return self.error_response(
+                            raw.get("message", "Unexpected response from TwelveData")
+                        )
                     history = PriceHistory(
                         ticker=ticker,
                         history=[
-                            PricePoint(date=entry["datetime"], close=float(entry["close"]))
+                            PricePoint(
+                                date=entry["datetime"], close=float(entry["close"])
+                            )
                             for entry in reversed(raw["values"])
                         ],
                     )
                     self._circuit.record_success()
-                    return ProviderResponse(data=history, raw=raw, provider=self.name, fetched_at=self.now())
+                    return ProviderResponse(
+                        data=history, raw=raw, provider=self.name, fetched_at=self.now()
+                    )
             except Exception as exc:
                 self._circuit.record_failure()
-                logger.exception("twelvedata get_price_history error", extra={"ticker": ticker})
+                logger.exception(
+                    "twelvedata get_price_history error", extra={"ticker": ticker}
+                )
                 return self.error_response(str(exc))
 
     async def get_financials(self, ticker: str) -> ProviderResponse[Financials]:

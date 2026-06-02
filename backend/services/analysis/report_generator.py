@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 
 from services.analysis.context_builder import StructuredContext
-from services.llm import REPORT_MODEL, get_client
+from services.llm import REPORT_MODEL, get_anthropic_client
 
 logger = logging.getLogger(__name__)
 
@@ -45,34 +45,65 @@ async def generate(
     exchange_line = f" ({context.exchange})" if context.exchange else ""
     report_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
 
-    user_content = (
-        f"Company: {context.ticker} — {context.company_name}{exchange_line}\n"
-        f"Report date: {report_date}\n\n"
-        f"=== STRUCTURED FINANCIAL DATA ===\n"
-        f"{context.metrics_block}\n\n"
-        f"=== ANNUAL FILING EXCERPT ===\n"
-        f"{context.filing_excerpt or 'No filing data available for this ticker.'}"
-    )
+    sections = [
+        f"Company: {context.ticker} — {context.company_name}{exchange_line}",
+        f"Report date: {report_date}",
+        "",
+        "=== STRUCTURED FINANCIAL DATA ===",
+        context.metrics_block,
+    ]
+    if context.business_summary:
+        sections += ["", "=== BUSINESS OVERVIEW ===", context.business_summary]
+    if context.leadership_block:
+        sections += ["", "=== LEADERSHIP & GOVERNANCE ===", context.leadership_block]
+    if context.market_intelligence_block:
+        sections += [
+            "",
+            "=== MARKET INTELLIGENCE ===",
+            context.market_intelligence_block,
+        ]
+    sections += [
+        "",
+        "=== ANNUAL FILING EXCERPT ===",
+        context.filing_excerpt or "No filing data available for this ticker.",
+    ]
+    user_content = "\n".join(sections)
 
-    client = get_client()
+    logger.info(
+        "calling Sonnet (streaming)",
+        extra={
+            "ticker": context.ticker,
+            "model": REPORT_MODEL,
+            "template": report_template_key,
+            "has_business_summary": bool(context.business_summary),
+            "has_leadership": bool(context.leadership_block),
+            "has_market_intel": bool(context.market_intelligence_block),
+        },
+    )
+    client = get_anthropic_client()
     async with client.messages.stream(
         model=REPORT_MODEL,
         max_tokens=4096,
-        system=[{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}],
+        system=[
+            {
+                "type": "text",
+                "text": system_text,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
         messages=[{"role": "user", "content": user_content}],
     ) as stream:
         report_markdown = await stream.get_final_text()
         message = await stream.get_final_message()
 
-    cache_stats = getattr(message.usage, "cache_read_input_tokens", 0)
+    cache_read = getattr(message.usage, "cache_read_input_tokens", 0)
     logger.info(
-        "report generated",
+        "Sonnet complete",
         extra={
             "ticker": context.ticker,
-            "report_template": report_template_key,
-            "input_tokens": message.usage.input_tokens,
-            "output_tokens": message.usage.output_tokens,
-            "cache_read_tokens": cache_stats,
+            "in": message.usage.input_tokens,
+            "out": message.usage.output_tokens,
+            "cache_hit": cache_read,
         },
     )
 

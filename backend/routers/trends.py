@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 
 from services.pg import get_trends_cache, upsert_trends_cache
 from services.trends import TIMEFRAME_OPTIONS, fetch_trends_data
+
+logger = logging.getLogger(__name__)
 
 COMMODITIES: dict[str, str] = {
     "Gold": "gold",
@@ -29,7 +33,9 @@ async def trends(
     geo: str = Query(""),
 ) -> dict:
     if not commodities:
-        raise HTTPException(status_code=400, detail="At least one commodity is required")
+        raise HTTPException(
+            status_code=400, detail="At least one commodity is required"
+        )
 
     unknown = [c for c in commodities if c not in COMMODITIES]
     if unknown:
@@ -50,8 +56,12 @@ async def trends(
             timeframe_label=timeframe,
             geo=geo.strip().upper(),
         )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception:
+        logger.exception("trends fetch error", extra={"commodities": commodities})
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "TRENDS_ERROR", "message": "Trends data unavailable"},
+        )
 
     await upsert_trends_cache(cache_key, result)
     return result

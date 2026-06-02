@@ -48,8 +48,12 @@ class TestLookup:
         assert response.provider == "openfigi"
         assert response.error is None
 
-    async def test_passes_exchange_hint_in_payload(self, adapter: OpenFIGIAdapter) -> None:
-        raw_data = [{"data": [{"figi": "BBG000B9XRY4", "name": "APPLE INC", "exchCode": "US"}]}]
+    async def test_passes_exchange_hint_in_payload(
+        self, adapter: OpenFIGIAdapter
+    ) -> None:
+        raw_data = [
+            {"data": [{"figi": "BBG000B9XRY4", "name": "APPLE INC", "exchCode": "US"}]}
+        ]
         mock_response = MagicMock()
         mock_response.is_success = True
         mock_response.json.return_value = raw_data
@@ -67,7 +71,9 @@ class TestLookup:
         payload = call_kwargs.kwargs["json"]
         assert payload[0].get("exchCode") == "US"
 
-    async def test_returns_error_on_http_failure(self, adapter: OpenFIGIAdapter) -> None:
+    async def test_returns_error_on_http_failure(
+        self, adapter: OpenFIGIAdapter
+    ) -> None:
         mock_response = MagicMock()
         mock_response.is_success = False
         mock_response.status_code = 401

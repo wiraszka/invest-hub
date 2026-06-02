@@ -22,7 +22,9 @@ def _str_date(v: Any) -> str | None:
 
 
 def _session() -> AsyncSession:
-    factory = async_sessionmaker(_get_engine(), expire_on_commit=False, class_=AsyncSession)
+    factory = async_sessionmaker(
+        _get_engine(), expire_on_commit=False, class_=AsyncSession
+    )
     return factory()
 
 
@@ -71,25 +73,29 @@ async def replace_transactions_for_source(
                 )
             )
             if transactions:
-                session.add_all([
-                    Transaction(
-                        user_id=user_id,
-                        source=t.get("source"),
-                        account_type=t.get("account_type"),
-                        symbol=t.get("symbol"),
-                        raw_symbol=t.get("raw_symbol"),
-                        name=t.get("name"),
-                        activity_type=t.get("activity_type"),
-                        activity_sub_type=t.get("activity_sub_type"),
-                        transaction_date=date.fromisoformat(t["transaction_date"]) if t.get("transaction_date") else None,
-                        quantity=t.get("quantity"),
-                        unit_price=t.get("unit_price"),
-                        commission=t.get("commission"),
-                        net_cash_amount=t.get("net_cash_amount"),
-                        currency=t.get("currency"),
-                    )
-                    for t in transactions
-                ])
+                session.add_all(
+                    [
+                        Transaction(
+                            user_id=user_id,
+                            source=t.get("source"),
+                            account_type=t.get("account_type"),
+                            symbol=t.get("symbol"),
+                            raw_symbol=t.get("raw_symbol"),
+                            name=t.get("name"),
+                            activity_type=t.get("activity_type"),
+                            activity_sub_type=t.get("activity_sub_type"),
+                            transaction_date=date.fromisoformat(t["transaction_date"])
+                            if t.get("transaction_date")
+                            else None,
+                            quantity=t.get("quantity"),
+                            unit_price=t.get("unit_price"),
+                            commission=t.get("commission"),
+                            net_cash_amount=t.get("net_cash_amount"),
+                            currency=t.get("currency"),
+                        )
+                        for t in transactions
+                    ]
+                )
 
 
 async def get_transactions(user_id: str) -> list[dict]:
@@ -157,14 +163,16 @@ async def set_holdings(user_id: str, holdings: list[dict]) -> None:
         async with session.begin():
             await session.execute(delete(Holding).where(Holding.user_id == user_id))
             if holdings:
-                session.add_all([
-                    Holding(
-                        user_id=user_id,
-                        exchange=h.get("exchange") or None,
-                        raw_data=h,
-                    )
-                    for h in holdings
-                ])
+                session.add_all(
+                    [
+                        Holding(
+                            user_id=user_id,
+                            exchange=h.get("exchange") or None,
+                            raw_data=h,
+                        )
+                        for h in holdings
+                    ]
+                )
 
 
 # ---------------------------------------------------------------------------

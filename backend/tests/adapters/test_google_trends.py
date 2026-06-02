@@ -25,14 +25,19 @@ def _make_trends_df() -> pd.DataFrame:
 
 
 class TestFetch:
-    async def test_returns_trends_result_on_success(self, adapter: GoogleTrendsAdapter) -> None:
+    async def test_returns_trends_result_on_success(
+        self, adapter: GoogleTrendsAdapter
+    ) -> None:
         with patch("adapters.google_trends.asyncio.to_thread") as mock_thread:
             from adapters.google_trends import _fetch_sync
 
-            mock_thread.return_value = _fetch_sync.__wrapped__ if hasattr(_fetch_sync, "__wrapped__") else None
+            mock_thread.return_value = (
+                _fetch_sync.__wrapped__ if hasattr(_fetch_sync, "__wrapped__") else None
+            )
 
             with patch("adapters.google_trends._fetch_sync") as mock_fetch:
                 from models.market_data import TrendsPoint
+
                 mock_fetch.return_value = TrendsResult(
                     series=[{"date": "2024-01-10", "Gold": 59, "Silver": 39}],
                     latest=[
@@ -56,8 +61,13 @@ class TestFetch:
         assert response.provider == "google_trends"
         assert response.error is None
 
-    async def test_returns_error_on_exception(self, adapter: GoogleTrendsAdapter) -> None:
-        with patch("adapters.google_trends.asyncio.to_thread", side_effect=RuntimeError("pytrends error")):
+    async def test_returns_error_on_exception(
+        self, adapter: GoogleTrendsAdapter
+    ) -> None:
+        with patch(
+            "adapters.google_trends.asyncio.to_thread",
+            side_effect=RuntimeError("pytrends error"),
+        ):
             response = await adapter.fetch(
                 commodities=["Gold"],
                 keyword_map=KEYWORD_MAP,

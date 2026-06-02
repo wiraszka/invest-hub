@@ -42,7 +42,9 @@ class TestCircuitBreaker:
         breaker.check()  # should not raise
 
     def test_half_opens_after_cooldown(self, breaker: CircuitBreaker) -> None:
-        fast_breaker = CircuitBreaker(provider="test", failure_threshold=1, cooldown_seconds=0.01)
+        fast_breaker = CircuitBreaker(
+            provider="test", failure_threshold=1, cooldown_seconds=0.01
+        )
         fast_breaker.record_failure()
 
         assert fast_breaker.is_open

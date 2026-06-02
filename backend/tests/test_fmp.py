@@ -148,9 +148,12 @@ def test_get_financials_key_metrics_parsed_correctly():
 
 
 def test_get_financials_returns_none_when_ticker_not_found():
-    with patch("services.fmp.requests.get", side_effect=[
-        _mock_response([]),
-    ]):
+    with patch(
+        "services.fmp.requests.get",
+        side_effect=[
+            _mock_response([]),
+        ],
+    ):
         result = get_financials("XXXX")
 
     assert result is None
@@ -195,9 +198,12 @@ def test_get_profile_description_returns_text():
 
 
 def test_get_profile_description_returns_none_when_not_found():
-    with patch("services.fmp.requests.get", side_effect=[
-        _mock_response([]),
-    ]):
+    with patch(
+        "services.fmp.requests.get",
+        side_effect=[
+            _mock_response([]),
+        ],
+    ):
         result = get_profile_description("XXXX")
 
     assert result is None
@@ -206,7 +212,9 @@ def test_get_profile_description_returns_none_when_not_found():
 def test_get_profile_description_returns_none_when_description_missing():
     profile_no_desc = [{**MOCK_PROFILE[0], "description": None}]
 
-    with patch("services.fmp.requests.get", return_value=_mock_response(profile_no_desc)):
+    with patch(
+        "services.fmp.requests.get", return_value=_mock_response(profile_no_desc)
+    ):
         result = get_profile_description("NNE")
 
     assert result is None
@@ -238,10 +246,13 @@ def test_get_quote_price_retries_without_to_suffix():
 
 
 def test_get_quote_price_returns_none_when_not_found():
-    with patch("services.fmp.requests.get", side_effect=[
-        _mock_response([]),
-        _mock_response([]),
-    ]):
+    with patch(
+        "services.fmp.requests.get",
+        side_effect=[
+            _mock_response([]),
+            _mock_response([]),
+        ],
+    ):
         result = get_quote_price("XXXX")
 
     assert result is None

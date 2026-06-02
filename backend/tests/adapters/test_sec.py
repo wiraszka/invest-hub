@@ -47,9 +47,19 @@ class TestGetFinancials:
 
             mock_thread.return_value = Financials(
                 currency="USD",
-                income=[IncomeStatement(period="annual", revenue=383_285_000_000.0, net_income=96_995_000_000.0)],
-                balance_sheet=BalanceSheet(period="annual", cash=29_965_000_000.0, total_debt=109_280_000_000.0),
-                cash_flow=[CashFlow(period="annual", operating_cash_flow=110_543_000_000.0)],
+                income=[
+                    IncomeStatement(
+                        period="annual",
+                        revenue=383_285_000_000.0,
+                        net_income=96_995_000_000.0,
+                    )
+                ],
+                balance_sheet=BalanceSheet(
+                    period="annual", cash=29_965_000_000.0, total_debt=109_280_000_000.0
+                ),
+                cash_flow=[
+                    CashFlow(period="annual", operating_cash_flow=110_543_000_000.0)
+                ],
             )
 
             response = await adapter.get_financials("AAPL")
@@ -61,7 +71,10 @@ class TestGetFinancials:
         assert response.error is None
 
     async def test_returns_error_on_exception(self, adapter: SECAdapter) -> None:
-        with patch("adapters.sec.asyncio.to_thread", side_effect=ValueError("Ticker not found: FAKE")):
+        with patch(
+            "adapters.sec.asyncio.to_thread",
+            side_effect=ValueError("Ticker not found: FAKE"),
+        ):
             response = await adapter.get_financials("FAKE")
 
         assert response.data is None
@@ -72,7 +85,9 @@ class TestGetFinancials:
 class TestGetProfile:
     async def test_returns_profile_on_success(self, adapter: SECAdapter) -> None:
         with patch("adapters.sec.asyncio.to_thread") as mock_thread:
-            mock_thread.return_value = CompanyIdentity(name="APPLE INC", exchange="NASDAQ")
+            mock_thread.return_value = CompanyIdentity(
+                name="APPLE INC", exchange="NASDAQ"
+            )
 
             response = await adapter.get_profile("AAPL")
 
@@ -84,7 +99,10 @@ class TestGetProfile:
         assert response.error is None
 
     async def test_returns_error_on_exception(self, adapter: SECAdapter) -> None:
-        with patch("adapters.sec.asyncio.to_thread", side_effect=ValueError("Ticker not found: FAKE")):
+        with patch(
+            "adapters.sec.asyncio.to_thread",
+            side_effect=ValueError("Ticker not found: FAKE"),
+        ):
             response = await adapter.get_profile("FAKE")
 
         assert response.data is None
@@ -96,9 +114,18 @@ class TestFetchSync:
         from adapters.sec import _fetch_financials_sync
 
         with patch("adapters.sec.sec_service.resolve_cik", return_value="0000320193"):
-            with patch("adapters.sec.sec_service.get_submissions", return_value=SUBMISSIONS_STUB):
-                with patch("adapters.sec.sec_service.find_recent_annual", return_value=("acc", "doc", "10-K", "2023-11-03")):
-                    with patch("adapters.sec.sec_service.get_xbrl_facts", return_value=FACTS_STUB):
+            with patch(
+                "adapters.sec.sec_service.get_submissions",
+                return_value=SUBMISSIONS_STUB,
+            ):
+                with patch(
+                    "adapters.sec.sec_service.find_recent_annual",
+                    return_value=("acc", "doc", "10-K", "2023-11-03"),
+                ):
+                    with patch(
+                        "adapters.sec.sec_service.get_xbrl_facts",
+                        return_value=FACTS_STUB,
+                    ):
                         result = _fetch_financials_sync("AAPL")
 
         assert isinstance(result, Financials)
@@ -112,7 +139,10 @@ class TestFetchSync:
         from adapters.sec import _fetch_profile_sync
 
         with patch("adapters.sec.sec_service.resolve_cik", return_value="0000320193"):
-            with patch("adapters.sec.sec_service.get_submissions", return_value=SUBMISSIONS_STUB):
+            with patch(
+                "adapters.sec.sec_service.get_submissions",
+                return_value=SUBMISSIONS_STUB,
+            ):
                 result = _fetch_profile_sync("AAPL")
 
         assert isinstance(result, CompanyIdentity)

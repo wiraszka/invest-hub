@@ -13,9 +13,15 @@ def _make_financials(
 ) -> Financials:
     return Financials(
         currency="USD",
-        income=[IncomeStatement(period="FY2024", revenue=1_000_000.0)] if income else [],
-        balance_sheet=BalanceSheet(period="FY2024", cash=100_000.0) if balance_sheet else None,
-        cash_flow=[CashFlow(period="FY2024", free_cash_flow=50_000.0)] if cash_flow else [],
+        income=[IncomeStatement(period="FY2024", revenue=1_000_000.0)]
+        if income
+        else [],
+        balance_sheet=BalanceSheet(period="FY2024", cash=100_000.0)
+        if balance_sheet
+        else None,
+        cash_flow=[CashFlow(period="FY2024", free_cash_flow=50_000.0)]
+        if cash_flow
+        else [],
     )
 
 
@@ -47,7 +53,9 @@ class TestFinancialsSufficient:
 
 
 class TestGetFinancialsHollowFallthrough:
-    async def test_falls_through_to_fmp_when_yfinance_returns_hollow_response(self) -> None:
+    async def test_falls_through_to_fmp_when_yfinance_returns_hollow_response(
+        self,
+    ) -> None:
         hollow = _make_financials()
         full = _make_financials(income=True, balance_sheet=True, cash_flow=True)
 
@@ -73,14 +81,9 @@ class TestGetFinancialsHollowFallthrough:
         svc = MarketDataService(registry)
         mock_session = MagicMock()
 
-        with (
-            patch("services.market_data_service.cache") as mock_cache,
-            patch("services.market_data_service.resolve_identity", new=AsyncMock(
-                return_value=MagicMock(canonical_id=None, name="AAPL")
-            )),
-        ):
+        with patch("services.market_data_service.cache") as mock_cache:
             mock_cache.get.return_value = None
-            result = await svc.get_financials("AAPL", mock_session)
+            result = await svc.get_financials("AAPL", None, mock_session)
 
         assert result is full
         yfinance_adapter.get_financials.assert_awaited_once()

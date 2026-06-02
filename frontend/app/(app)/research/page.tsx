@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import ResearchSearchBar from "@/components/research/ResearchSearchBar";
 import RecentChips from "@/components/research/RecentChips";
-import ResearchPanel from "@/components/research/ResearchPanel";
 import type { AnalysisData } from "@/components/research/ResearchPanel";
+
+const ResearchPanel = dynamic(
+  () => import("@/components/research/ResearchPanel"),
+  {
+    ssr: false,
+  },
+);
 
 const CACHE_KEY = "research_cache";
 const RECENT_KEY = "research_recent";

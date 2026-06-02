@@ -13,6 +13,7 @@ On the existing Neon database, run:
 On a fresh database, run:
     alembic upgrade head
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -39,19 +40,39 @@ def upgrade() -> None:
         sa.Column("sector", sa.Text(), nullable=True),
         sa.Column("country", sa.Text(), nullable=True),
         sa.Column("asset_type", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
     # --- company_provider_xref ---
     op.create_table(
         "company_provider_xref",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("canonical_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("companies.canonical_id"), nullable=False),
+        sa.Column(
+            "canonical_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("companies.canonical_id"),
+            nullable=False,
+        ),
         sa.Column("provider", sa.Text(), nullable=False),
         sa.Column("provider_ticker", sa.Text(), nullable=False),
         sa.Column("provider_name", sa.Text(), nullable=True),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.UniqueConstraint("provider", "provider_ticker"),
     )
 
@@ -59,40 +80,75 @@ def upgrade() -> None:
     op.create_table(
         "raw_quotes",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("canonical_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("companies.canonical_id"), nullable=True),
+        sa.Column(
+            "canonical_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("companies.canonical_id"),
+            nullable=True,
+        ),
         sa.Column("provider", sa.Text(), nullable=False),
         sa.Column("symbol", sa.Text(), nullable=False),
         sa.Column("raw_data", postgresql.JSONB(), nullable=False),
-        sa.Column("fetched_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "fetched_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
     # --- raw_financials ---
     op.create_table(
         "raw_financials",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("canonical_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("companies.canonical_id"), nullable=True),
+        sa.Column(
+            "canonical_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("companies.canonical_id"),
+            nullable=True,
+        ),
         sa.Column("provider", sa.Text(), nullable=False),
         sa.Column("symbol", sa.Text(), nullable=False),
         sa.Column("period", sa.Text(), nullable=False),
         sa.Column("raw_data", postgresql.JSONB(), nullable=False),
-        sa.Column("fetched_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "fetched_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
     # --- quotes (normalized) ---
     op.create_table(
         "quotes",
-        sa.Column("canonical_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("companies.canonical_id"), primary_key=True),
+        sa.Column(
+            "canonical_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("companies.canonical_id"),
+            primary_key=True,
+        ),
         sa.Column("price", sa.Numeric(), nullable=True),
         sa.Column("currency", sa.Text(), nullable=True),
         sa.Column("source", sa.Text(), nullable=True),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
     # --- financials (normalized) ---
     op.create_table(
         "financials",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("canonical_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("companies.canonical_id"), nullable=False),
+        sa.Column(
+            "canonical_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("companies.canonical_id"),
+            nullable=False,
+        ),
         sa.Column("period", sa.Text(), nullable=False),
         sa.Column("fiscal_year", sa.Integer(), nullable=True),
         sa.Column("revenue", sa.Numeric(), nullable=True),
@@ -116,7 +172,12 @@ def upgrade() -> None:
         sa.Column("roe", sa.Numeric(), nullable=True),
         sa.Column("currency", sa.Text(), nullable=True),
         sa.Column("sources", postgresql.ARRAY(sa.Text()), nullable=True),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.UniqueConstraint("canonical_id", "period"),
     )
 
@@ -139,7 +200,9 @@ def upgrade() -> None:
         sa.Column("net_cash_amount", sa.Numeric(), nullable=True),
         sa.Column("currency", sa.Text(), nullable=True),
     )
-    op.create_index("ix_transactions_user_source", "transactions", ["user_id", "source"])
+    op.create_index(
+        "ix_transactions_user_source", "transactions", ["user_id", "source"]
+    )
 
     # --- holdings ---
     op.create_table(
@@ -152,7 +215,12 @@ def upgrade() -> None:
         sa.Column("quantity", sa.Numeric(), nullable=True),
         sa.Column("currency", sa.Text(), nullable=True),
         sa.Column("raw_data", postgresql.JSONB(), nullable=False),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
     op.create_index("ix_holdings_user_id", "holdings", ["user_id"])
 
@@ -167,7 +235,12 @@ def upgrade() -> None:
         sa.Column("visible_columns", postgresql.JSONB(), nullable=True),
         sa.Column("middle_chart_column", sa.Text(), nullable=True),
         sa.Column("chart_value_mode", sa.Text(), nullable=True),
-        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
     # --- trends_cache ---
@@ -175,7 +248,12 @@ def upgrade() -> None:
         "trends_cache",
         sa.Column("cache_key", sa.Text(), primary_key=True),
         sa.Column("data", postgresql.JSONB(), nullable=False),
-        sa.Column("fetched_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "fetched_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
 

@@ -29,7 +29,6 @@ def _get(path: str, **params) -> list | dict | None:
         return None
 
 
-
 def _resolve_ticker(symbol: str) -> tuple[str, list | None]:
     """Try symbol as-is; if it ends with .TO also try without the suffix (US cross-listing)."""
     data = _get("/profile", symbol=symbol)
@@ -41,7 +40,6 @@ def _resolve_ticker(symbol: str) -> tuple[str, list | None]:
         if data and isinstance(data, list) and len(data) > 0:
             return base, data
     return symbol, None
-
 
 
 def get_financials(symbol: str) -> dict | None:
@@ -63,14 +61,16 @@ def get_financials(symbol: str) -> dict | None:
     income = []
     for entry in income_raw:
         year_raw = entry.get("fiscalYear") or entry.get("date", "")[:4]
-        income.append({
-            "year": int(year_raw) if year_raw else None,
-            "revenue": entry.get("revenue"),
-            "gross_profit": entry.get("grossProfit"),
-            "operating_income": entry.get("operatingIncome"),
-            "net_income": entry.get("netIncome"),
-            "ebitda": entry.get("ebitda"),
-        })
+        income.append(
+            {
+                "year": int(year_raw) if year_raw else None,
+                "revenue": entry.get("revenue"),
+                "gross_profit": entry.get("grossProfit"),
+                "operating_income": entry.get("operatingIncome"),
+                "net_income": entry.get("netIncome"),
+                "ebitda": entry.get("ebitda"),
+            }
+        )
 
     balance: dict = {}
     balance_raw = _get("/balance-sheet-statement", symbol=fmp_ticker, limit=1)
@@ -89,12 +89,14 @@ def get_financials(symbol: str) -> dict | None:
     if cashflow_raw and isinstance(cashflow_raw, list):
         for entry in cashflow_raw:
             year_raw = entry.get("fiscalYear") or entry.get("date", "")[:4]
-            cash_flow.append({
-                "year": int(year_raw) if year_raw else None,
-                "operating_cash_flow": entry.get("operatingCashFlow"),
-                "capex": entry.get("capitalExpenditure"),
-                "free_cash_flow": entry.get("freeCashFlow"),
-            })
+            cash_flow.append(
+                {
+                    "year": int(year_raw) if year_raw else None,
+                    "operating_cash_flow": entry.get("operatingCashFlow"),
+                    "capex": entry.get("capitalExpenditure"),
+                    "free_cash_flow": entry.get("freeCashFlow"),
+                }
+            )
 
     metrics: dict = {}
     metrics_raw = _get("/key-metrics", symbol=fmp_ticker, limit=1)
@@ -127,7 +129,10 @@ def get_profile_description(symbol: str) -> str | None:
 
 def get_quote_price(symbol: str) -> float | None:
     """Return current price from FMP quote endpoint. Used as TwelveData failover."""
-    for candidate in [symbol, symbol[:-3] if symbol.endswith(".TO") else f"{symbol}.TO"]:
+    for candidate in [
+        symbol,
+        symbol[:-3] if symbol.endswith(".TO") else f"{symbol}.TO",
+    ]:
         data = _get("/quote", symbol=candidate)
         if data and isinstance(data, list) and len(data) > 0:
             price = data[0].get("price")

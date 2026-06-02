@@ -36,37 +36,43 @@ class TestResolveCanonicalWithExchange:
 
 class TestResolveCanonicalSymbolList:
     def test_tsx_found_in_symbol_list(self) -> None:
-        with patch("services.search._loaded", True), patch(
-            "services.search._ticker_set", {"SU.TO", "AAPL"}
+        with (
+            patch("services.search._loaded", True),
+            patch("services.search._ticker_set", {"SU.TO", "AAPL"}),
         ):
             assert resolve_canonical("SU") == "SU.TO"
 
     def test_tsxv_found_in_symbol_list(self) -> None:
-        with patch("services.search._loaded", True), patch(
-            "services.search._ticker_set", {"GGD.V", "AAPL"}
+        with (
+            patch("services.search._loaded", True),
+            patch("services.search._ticker_set", {"GGD.V", "AAPL"}),
         ):
             assert resolve_canonical("GGD") == "GGD.V"
 
     def test_us_only_no_suffix(self) -> None:
-        with patch("services.search._loaded", True), patch(
-            "services.search._ticker_set", {"AAPL"}
+        with (
+            patch("services.search._loaded", True),
+            patch("services.search._ticker_set", {"AAPL"}),
         ):
             assert resolve_canonical("AAPL") == "AAPL"
 
     def test_to_checked_before_v(self) -> None:
-        with patch("services.search._loaded", True), patch(
-            "services.search._ticker_set", {"SU.TO", "SU.V"}
+        with (
+            patch("services.search._loaded", True),
+            patch("services.search._ticker_set", {"SU.TO", "SU.V"}),
         ):
             assert resolve_canonical("SU") == "SU.TO"
 
     def test_unknown_defaults_to_to(self) -> None:
-        with patch("services.search._loaded", True), patch(
-            "services.search._ticker_set", set()
+        with (
+            patch("services.search._loaded", True),
+            patch("services.search._ticker_set", set()),
         ):
             assert resolve_canonical("XYZ") == "XYZ.TO"
 
     def test_exchange_hint_overrides_symbol_list(self) -> None:
-        with patch("services.search._loaded", True), patch(
-            "services.search._ticker_set", {"SU.TO"}
+        with (
+            patch("services.search._loaded", True),
+            patch("services.search._ticker_set", {"SU.TO"}),
         ):
             assert resolve_canonical("SU", "NYSE") == "SU"

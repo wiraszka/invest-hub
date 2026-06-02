@@ -67,7 +67,9 @@ def fetch_40f_sections(cik_10: str, accession: str) -> str:
     return extract_40f_sections(text)
 
 
-def _find_exhibit_url(soup: BeautifulSoup, exhibit_types: tuple[str, ...]) -> str | None:
+def _find_exhibit_url(
+    soup: BeautifulSoup, exhibit_types: tuple[str, ...]
+) -> str | None:
     """
     Search the EDGAR filing index table for the first matching exhibit type
     and return its absolute URL.

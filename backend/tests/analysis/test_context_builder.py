@@ -9,15 +9,20 @@ from models.market_data import (
     BalanceSheet,
     CashFlow,
     CompanyIdentity,
+    CompanyOfficer,
     Financials,
     IncomeStatement,
     KeyMetrics,
+    LeadershipData,
+    MarketIntelligence,
     Quote,
 )
 from services.analysis.context_builder import (
     StructuredContext,
     _classify_template,
     _fmt,
+    _format_leadership,
+    _format_market_intelligence,
     _pct,
     _yoy,
     build,
@@ -26,7 +31,7 @@ from services.analysis.context_builder import (
 
 def _make_financials() -> Financials:
     return Financials(
-        canonical_id="abc-123",
+        security_id="abc-123",
         currency="USD",
         income=[
             IncomeStatement(
@@ -88,29 +93,107 @@ def _make_quote() -> Quote:
 
 def _make_profile() -> CompanyIdentity:
     return CompanyIdentity(
-        canonical_id="abc-123",
+        security_id="abc-123",
         name="Apple Inc.",
         exchange="NASDAQ",
         currency="USD",
     )
 
 
+def _make_identity() -> CompanyIdentity:
+    return CompanyIdentity(
+        security_id="abc-123",
+        name="Apple Inc.",
+        exchange="NASDAQ",
+        currency="USD",
+    )
+
+
+def _patch_fetch_providers(
+    identity: CompanyIdentity,
+    financials: "Financials | None",
+    quote: "Quote | None",
+    profile: "CompanyIdentity | None" = None,
+    leadership: "LeadershipData | None" = None,
+    market_intelligence: "MarketIntelligence | None" = None,
+):
+    """Return a context manager that patches all fetch_providers dependencies."""
+    from contextlib import ExitStack
+
+    # Map service method objects → return values so the side effect can
+    # identify which capability is being requested without a "key" string.
+    def _adapter_side_effect(method, ticker: str, security_id):
+        from services.market_data_service import MarketDataService
+
+        svc = MarketDataService.__new__(MarketDataService)
+        mapping = {
+            svc.get_financials.__func__: financials,
+            svc.get_quote.__func__: quote,
+            svc.get_profile.__func__: profile,
+            svc.get_leadership.__func__: leadership,
+            svc.get_market_intelligence.__func__: market_intelligence,
+        }
+        # method is a bound method; look up by its underlying function
+        result = mapping.get(method.__func__)
+        if result is None:
+            raise Exception(f"unavailable: {method.__name__}")
+        return result
+
+    stack = ExitStack()
+    stack.enter_context(
+        patch(
+            "services.analysis.context_builder.resolve_identity",
+            new=AsyncMock(return_value=identity),
+        )
+    )
+    stack.enter_context(
+        patch(
+            "services.analysis.context_builder._load_financials_from_db",
+            new=AsyncMock(return_value=None),
+        )
+    )
+    stack.enter_context(
+        patch(
+            "services.analysis.context_builder._load_quote_from_db",
+            new=AsyncMock(return_value=None),
+        )
+    )
+    stack.enter_context(
+        patch(
+            "services.analysis.context_builder._load_leadership_from_db",
+            new=AsyncMock(return_value=None),
+        )
+    )
+    stack.enter_context(
+        patch(
+            "services.analysis.context_builder._load_market_intelligence_from_db",
+            new=AsyncMock(return_value=None),
+        )
+    )
+    stack.enter_context(
+        patch(
+            "services.analysis.context_builder._service_call_with_own_session",
+            side_effect=AsyncMock(side_effect=_adapter_side_effect),
+        )
+    )
+    return stack
+
+
 class TestBuild:
+    """Tests for build() / fetch_providers() — provider data fetching only.
+
+    The SEC filing is no longer fetched here (moved to filing_service /
+    run_filing).  filing_excerpt is always "" from fetch_providers().
+    """
+
     async def test_returns_structured_context_on_success(self) -> None:
         mock_session = MagicMock()
         financials = _make_financials()
         quote = _make_quote()
         profile = _make_profile()
+        identity = _make_identity()
 
-        with (
-            patch("services.analysis.context_builder.MarketDataService") as mock_svc_cls,
-            patch("services.analysis.context_builder.asyncio.to_thread", new=AsyncMock(return_value="filing text")),
-        ):
-            mock_svc = mock_svc_cls.return_value
-            mock_svc.get_financials = AsyncMock(return_value=financials)
-            mock_svc.get_quote = AsyncMock(return_value=quote)
-            mock_svc.get_profile = AsyncMock(return_value=profile)
-
+        with _patch_fetch_providers(identity, financials, quote, profile):
             result = await build("AAPL", mock_session)
 
         assert isinstance(result, StructuredContext)
@@ -118,44 +201,68 @@ class TestBuild:
         assert result.company_name == "Apple Inc."
         assert result.exchange == "NASDAQ"
         assert result.currency == "USD"
-        assert result.canonical_id == "abc-123"
-        assert result.template_key != ""
+        assert result.security_id == "abc-123"
+        # fetch_providers() no longer classifies — template_key is always ""
+        assert result.template_key == ""
         assert "Revenue" in result.metrics_block
-        assert result.filing_excerpt == "filing text"
+        # Filing is no longer fetched by build() — always empty
+        assert result.filing_excerpt == ""
+        assert result.leadership_block == ""
+        assert result.market_intelligence_block == ""
 
-    async def test_filing_failure_does_not_raise(self) -> None:
+    async def test_leadership_and_market_intelligence_populate_blocks(self) -> None:
         mock_session = MagicMock()
         financials = _make_financials()
         quote = _make_quote()
+        profile = _make_profile()
+        identity = _make_identity()
+        leadership = LeadershipData(
+            officers=[
+                CompanyOfficer(
+                    name="Tim Cook", title="CEO", age=63, total_pay=63_000_000
+                )
+            ],
+            held_percent_insiders=0.0007,
+            audit_risk=4,
+        )
+        mi = MarketIntelligence(
+            recommendation="buy",
+            recommendation_score=2.1,
+            analyst_count=42,
+            fifty_two_week_high=237.23,
+            fifty_two_week_low=164.08,
+        )
 
-        with (
-            patch("services.analysis.context_builder.MarketDataService") as mock_svc_cls,
-            patch("services.analysis.context_builder.asyncio.to_thread", new=AsyncMock(side_effect=ValueError("no CIK"))),
+        with _patch_fetch_providers(
+            identity, financials, quote, profile, leadership, mi
         ):
-            mock_svc = mock_svc_cls.return_value
-            mock_svc.get_financials = AsyncMock(return_value=financials)
-            mock_svc.get_quote = AsyncMock(return_value=quote)
-            mock_svc.get_profile = AsyncMock(side_effect=Exception("profile unavailable"))
-
             result = await build("AAPL", mock_session)
 
-        assert result.filing_excerpt == ""
-        assert result.company_name == "AAPL"
+        assert "Tim Cook" in result.leadership_block
+        assert "CEO" in result.leadership_block
+        assert "buy" in result.market_intelligence_block
+        assert "237.23" in result.market_intelligence_block
+
+    async def test_leadership_failure_does_not_raise(self) -> None:
+        mock_session = MagicMock()
+        financials = _make_financials()
+        quote = _make_quote()
+        identity = _make_identity()
+
+        with _patch_fetch_providers(identity, financials, quote):
+            result = await build("AAPL", mock_session)
+
+        assert result.leadership_block == ""
+        assert result.market_intelligence_block == ""
+        assert result.company_name == "Apple Inc."
 
     async def test_raises_when_both_financials_and_quote_unavailable(self) -> None:
         from core.exceptions import ProviderUnavailableError
 
         mock_session = MagicMock()
+        identity = _make_identity()
 
-        with (
-            patch("services.analysis.context_builder.MarketDataService") as mock_svc_cls,
-            patch("services.analysis.context_builder.asyncio.to_thread", new=AsyncMock(return_value="")),
-        ):
-            mock_svc = mock_svc_cls.return_value
-            mock_svc.get_financials = AsyncMock(side_effect=Exception("down"))
-            mock_svc.get_quote = AsyncMock(side_effect=Exception("down"))
-            mock_svc.get_profile = AsyncMock(side_effect=Exception("down"))
-
+        with _patch_fetch_providers(identity, None, None):
             with pytest.raises(ProviderUnavailableError):
                 await build("AAPL", mock_session)
 
@@ -206,7 +313,7 @@ class TestMetricsBlock:
             company_name="Apple Inc.",
             exchange="NASDAQ",
             currency="USD",
-            canonical_id="abc-123",
+            security_id="abc-123",
             template_key="general",
             sector="Technology",
             industry="Software",
@@ -239,9 +346,104 @@ class TestMetricsBlock:
         assert "No financial data available" in block
 
 
+class TestFormatLeadership:
+    def test_returns_empty_string_for_none(self) -> None:
+        assert _format_leadership(None) == ""
+
+    def test_includes_officer_name_and_title(self) -> None:
+        leadership = LeadershipData(
+            officers=[
+                CompanyOfficer(
+                    name="Tim Cook", title="CEO", age=63, total_pay=63_000_000
+                )
+            ]
+        )
+        block = _format_leadership(leadership)
+        assert "Tim Cook" in block
+        assert "CEO" in block
+        assert "63" in block
+        assert "63,000,000" in block
+
+    def test_includes_ownership_percentages(self) -> None:
+        leadership = LeadershipData(
+            held_percent_insiders=0.000721,
+            held_percent_institutions=0.612345,
+        )
+        block = _format_leadership(leadership)
+        assert "0.07%" in block
+        assert "61.23%" in block
+
+    def test_includes_governance_risk_scores(self) -> None:
+        leadership = LeadershipData(
+            audit_risk=4, board_risk=3, compensation_risk=7, overall_governance_risk=4
+        )
+        block = _format_leadership(leadership)
+        assert "Audit: 4" in block
+        assert "Board: 3" in block
+        assert "Overall: 4" in block
+
+    def test_empty_leadership_returns_header_only(self) -> None:
+        block = _format_leadership(LeadershipData())
+        assert "Leadership" in block
+
+
+class TestFormatMarketIntelligence:
+    def test_returns_empty_string_for_none(self) -> None:
+        assert _format_market_intelligence(None) == ""
+
+    def test_includes_analyst_recommendation(self) -> None:
+        mi = MarketIntelligence(
+            recommendation="buy", recommendation_score=2.1, analyst_count=42
+        )
+        block = _format_market_intelligence(mi)
+        assert "buy" in block
+        assert "2.1" in block
+        assert "42" in block
+
+    def test_includes_price_targets(self) -> None:
+        mi = MarketIntelligence(
+            recommendation="buy",
+            target_mean_price=225.0,
+            target_median_price=220.0,
+            target_high_price=260.0,
+            target_low_price=180.0,
+        )
+        block = _format_market_intelligence(mi)
+        assert "225.00" in block
+        assert "260.00" in block
+        assert "180.00" in block
+
+    def test_includes_short_interest(self) -> None:
+        mi = MarketIntelligence(
+            shares_short=95_000_000,
+            short_ratio=2.4,
+            short_percent_of_float=0.0063,
+        )
+        block = _format_market_intelligence(mi)
+        assert "95,000,000" in block
+        assert "2.4" in block
+        assert "0.63%" in block
+
+    def test_includes_52_week_range(self) -> None:
+        mi = MarketIntelligence(fifty_two_week_high=237.23, fifty_two_week_low=164.08)
+        block = _format_market_intelligence(mi)
+        assert "237.23" in block
+        assert "164.08" in block
+
+    def test_returns_empty_string_for_all_none_fields(self) -> None:
+        assert _format_market_intelligence(MarketIntelligence()) == ""
+
+
 class TestClassifyTemplate:
-    def _profile(self, sector: str | None, industry: str | None, security_type: str | None = None) -> CompanyIdentity:
-        return CompanyIdentity(name="Test Co", sector=sector, industry=industry, security_type=security_type)
+    def _profile(
+        self, sector: str | None, industry: str | None, security_type: str | None = None
+    ) -> CompanyIdentity:
+        return CompanyIdentity(
+            name="Test Co",
+            sector=sector,
+            industry=industry,
+            security_type=security_type,
+        )
 
     def test_etf_security_type_returns_etf(self) -> None:
         profile = self._profile("Financials", None, security_type="etf")
@@ -253,44 +455,49 @@ class TestClassifyTemplate:
 
     def test_mining_sector_with_revenue_returns_mining(self) -> None:
         profile = self._profile("Basic Materials", "Gold Mining")
-        financials = Financials(currency="USD", income=[
-            IncomeStatement(period="FY2024", revenue=50_000_000)
-        ])
+        financials = Financials(
+            currency="USD",
+            income=[IncomeStatement(period="FY2024", revenue=50_000_000)],
+        )
         assert _classify_template(profile, financials) == "mining"
 
     def test_mining_sector_without_revenue_returns_pre_revenue_mining(self) -> None:
         profile = self._profile("Basic Materials", "Gold Mining")
-        financials = Financials(currency="USD", income=[
-            IncomeStatement(period="FY2024", revenue=0)
-        ])
+        financials = Financials(
+            currency="USD", income=[IncomeStatement(period="FY2024", revenue=0)]
+        )
         assert _classify_template(profile, financials) == "pre_revenue_mining"
 
     def test_biotech_industry_with_revenue_returns_biotech(self) -> None:
         profile = self._profile("Healthcare", "Biotechnology")
-        financials = Financials(currency="USD", income=[
-            IncomeStatement(period="FY2024", revenue=100_000_000)
-        ])
+        financials = Financials(
+            currency="USD",
+            income=[IncomeStatement(period="FY2024", revenue=100_000_000)],
+        )
         assert _classify_template(profile, financials) == "biotech"
 
     def test_energy_sector_with_revenue_returns_energy(self) -> None:
         profile = self._profile("Energy", "Oil & Gas")
-        financials = Financials(currency="USD", income=[
-            IncomeStatement(period="FY2024", revenue=500_000_000)
-        ])
+        financials = Financials(
+            currency="USD",
+            income=[IncomeStatement(period="FY2024", revenue=500_000_000)],
+        )
         assert _classify_template(profile, financials) == "energy"
 
     def test_tech_sector_with_revenue_returns_tech(self) -> None:
         profile = self._profile("Technology", "Software")
-        financials = Financials(currency="USD", income=[
-            IncomeStatement(period="FY2024", revenue=1_000_000_000)
-        ])
+        financials = Financials(
+            currency="USD",
+            income=[IncomeStatement(period="FY2024", revenue=1_000_000_000)],
+        )
         assert _classify_template(profile, financials) == "tech"
 
     def test_no_sector_with_revenue_returns_general(self) -> None:
         profile = self._profile(None, None)
-        financials = Financials(currency="USD", income=[
-            IncomeStatement(period="FY2024", revenue=200_000_000)
-        ])
+        financials = Financials(
+            currency="USD",
+            income=[IncomeStatement(period="FY2024", revenue=200_000_000)],
+        )
         assert _classify_template(profile, financials) == "general"
 
     def test_no_sector_without_revenue_returns_pre_revenue(self) -> None:
@@ -299,3 +506,153 @@ class TestClassifyTemplate:
     def test_no_financials_returns_pre_revenue(self) -> None:
         profile = self._profile("Technology", "Software")
         assert _classify_template(profile, None) == "pre_revenue"
+
+
+class TestBuildContextClassification:
+    """build_context() classifies internally when template_key is not provided."""
+
+    async def test_classifies_template_from_db_profile(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from db.pg_models import NormalizedFinancials, NormalizedProfile, Security
+        from services.analysis.context_builder import build_context
+
+        mock_session = MagicMock()
+
+        mock_security = MagicMock(spec=Security)
+        mock_security.name = "Test Corp"
+        mock_security.exchange = "NYSE"
+        mock_security.currency = "USD"
+
+        mock_profile = MagicMock(spec=NormalizedProfile)
+        mock_profile.sector = "Technology"
+        mock_profile.industry = "Software"
+        mock_profile.asset_type = None
+        mock_profile.logo_url = None
+        mock_profile.description = None
+
+        mock_fin_row = MagicMock(spec=NormalizedFinancials)
+        mock_fin_row.period = "FY2024"
+        mock_fin_row.fiscal_year = 2024
+        mock_fin_row.revenue = 1_000_000_000.0
+        mock_fin_row.gross_profit = 400_000_000.0
+        mock_fin_row.operating_income = 200_000_000.0
+        mock_fin_row.ebitda = None
+        mock_fin_row.net_income = 150_000_000.0
+        mock_fin_row.cash = None
+        mock_fin_row.total_debt = None
+        mock_fin_row.net_debt = None
+        mock_fin_row.total_equity = None
+        mock_fin_row.total_assets = None
+        mock_fin_row.operating_cash_flow = None
+        mock_fin_row.capex = None
+        mock_fin_row.free_cash_flow = None
+        mock_fin_row.market_cap = None
+        mock_fin_row.enterprise_value = None
+        mock_fin_row.pe_ratio = None
+        mock_fin_row.forward_pe = None
+        mock_fin_row.ev_ebitda = None
+        mock_fin_row.enterprise_to_revenue = None
+        mock_fin_row.price_to_book = None
+        mock_fin_row.peg_ratio = None
+        mock_fin_row.roe = None
+        mock_fin_row.return_on_assets = None
+        mock_fin_row.eps = None
+        mock_fin_row.forward_eps = None
+        mock_fin_row.revenue_growth = None
+        mock_fin_row.earnings_growth = None
+        mock_fin_row.dividend_yield = None
+        mock_fin_row.dividend_rate = None
+        mock_fin_row.payout_ratio = None
+        mock_fin_row.beta = None
+        mock_fin_row.debt_to_equity = None
+        mock_fin_row.quick_ratio = None
+        mock_fin_row.current_ratio = None
+        mock_fin_row.currency = "USD"
+        mock_fin_row.security_id = "abc-123"
+        mock_fin_row.updated_at = datetime.now(timezone.utc)
+
+        with (
+            patch(
+                "services.analysis.context_builder.resolve_identity",
+                new=AsyncMock(return_value=MagicMock(security_id="abc-123")),
+            ),
+            patch(
+                "services.analysis.context_builder._load_financials_from_db",
+                new=AsyncMock(
+                    return_value=Financials(
+                        security_id="abc-123",
+                        currency="USD",
+                        income=[
+                            IncomeStatement(
+                                period="FY2024",
+                                fiscal_year=2024,
+                                revenue=1_000_000_000.0,
+                            )
+                        ],
+                    )
+                ),
+            ),
+            patch(
+                "services.analysis.context_builder._load_quote_from_db",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "services.analysis.context_builder._load_leadership_from_db",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "services.analysis.context_builder._load_market_intelligence_from_db",
+                new=AsyncMock(return_value=None),
+            ),
+            patch.object(
+                mock_session,
+                "execute",
+                new=AsyncMock(
+                    side_effect=[
+                        MagicMock(
+                            scalar_one_or_none=MagicMock(return_value=mock_security)
+                        ),
+                        MagicMock(
+                            scalar_one_or_none=MagicMock(return_value=mock_profile)
+                        ),
+                    ]
+                ),
+            ),
+        ):
+            result = await build_context("TEST", mock_session)
+
+        assert result.template_key == "tech"
+
+    async def test_respects_explicit_template_key_override(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from services.analysis.context_builder import build_context
+
+        mock_session = MagicMock()
+
+        with (
+            patch(
+                "services.analysis.context_builder.resolve_identity",
+                new=AsyncMock(return_value=MagicMock(security_id=None)),
+            ),
+            patch(
+                "services.analysis.context_builder._load_financials_from_db",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "services.analysis.context_builder._load_quote_from_db",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "services.analysis.context_builder._load_leadership_from_db",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "services.analysis.context_builder._load_market_intelligence_from_db",
+                new=AsyncMock(return_value=None),
+            ),
+        ):
+            result = await build_context("TEST", mock_session, template_key="mining")
+
+        assert result.template_key == "mining"

@@ -30,12 +30,13 @@ interface HoldingRecord {
   market_price_currency?: string;
   market_value_cad?: number;
   unrealized_pl_cad?: number;
+  implied_fx?: number;
   is_option?: boolean;
   option_details?: string;
 }
 
 export default function InvestmentsPage() {
-  const { userId } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
   const {
     symbolMetadata,
     setSymbolMetadata,
@@ -81,13 +82,14 @@ export default function InvestmentsPage() {
   const base = process.env.NEXT_PUBLIC_BACKEND_URL;
 
   const load = useCallback(async () => {
-    if (!userId) return;
+    if (!isSignedIn) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const headers = { "X-User-Id": userId };
+      const token = await getToken();
+      const headers = { Authorization: `Bearer ${token}` };
 
       const [posRes, txnRes, prefRes, holdingsRes] = await Promise.all([
         fetch(`${base}/api/v1/investments/positions`, { headers }),
@@ -132,9 +134,7 @@ export default function InvestmentsPage() {
 
       const uniqueSymbols = [
         ...new Set(
-          posData
-            .filter((p) => p.account !== "Crypto")
-            .map((p) => p.symbol),
+          posData.filter((p) => p.account !== "Crypto").map((p) => p.symbol),
         ),
       ];
 
@@ -184,7 +184,7 @@ export default function InvestmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [userId, base, setSymbolMetadata, setAnalyzedTickers]);
+  }, [isSignedIn, getToken, base, setSymbolMetadata, setAnalyzedTickers]);
 
   function savePreferences(prefs: {
     groupingLabels: string[];
@@ -195,12 +195,17 @@ export default function InvestmentsPage() {
     middleChartColumn: string;
     chartValueMode: string;
   }) {
-    if (!userId || !base) return;
+    if (!isSignedIn || !base) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    saveTimeout.current = setTimeout(() => {
+    saveTimeout.current = setTimeout(async () => {
+      const token = await getToken();
+      if (!token) return;
       fetch(`${base}/api/v1/investments/preferences`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "X-User-Id": userId },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           grouping_labels: prefs.groupingLabels,
           grouping_assignments: prefs.groupingAssignments,
@@ -317,6 +322,7 @@ export default function InvestmentsPage() {
       market_price_currency: h.market_price_currency,
       market_value_cad: h.market_value_cad ?? undefined,
       unrealized_pl_cad: h.unrealized_pl_cad ?? undefined,
+      implied_fx: h.implied_fx ?? undefined,
     };
   }
 
@@ -350,12 +356,11 @@ export default function InvestmentsPage() {
             to track your portfolio
           </p>
         </div>
-        {userId && (
+        {isSignedIn && (
           <div className="flex items-start gap-2">
-            <UploadManager userId={userId} onUpload={load} />
+            <UploadManager onUpload={load} />
             {hasData && (
               <CsvDropzone
-                userId={userId}
                 onUpload={load}
                 label={hasHoldings ? "Holdings ✓" : "↑ Holdings"}
                 uploaded={hasHoldings}
