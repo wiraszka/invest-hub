@@ -20,7 +20,8 @@ export function canonicalTicker(symbol: string, exchange?: string): string {
   if (!exchange) return symbol;
   const exch = exchange.toUpperCase();
   if (exch === "TSX") return `${symbol}.TO`;
-  if (exch === "TSXV" || exch === "TSX-V" || exch === "TSX VENTURE") return `${symbol}.V`;
+  if (exch === "TSXV" || exch === "TSX-V" || exch === "TSX VENTURE")
+    return `${symbol}.V`;
   return symbol;
 }
 

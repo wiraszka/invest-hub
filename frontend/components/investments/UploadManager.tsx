@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
 
 interface SourceSummary {
@@ -10,7 +11,6 @@ interface SourceSummary {
 }
 
 interface Props {
-  userId: string;
   onUpload: () => void;
 }
 
@@ -33,7 +33,8 @@ function fmtRange(min: string, max: string): string {
   return minFmt === maxFmt ? minFmt : `${minFmt} – ${maxFmt}`;
 }
 
-export default function UploadManager({ userId, onUpload }: Props) {
+export default function UploadManager({ onUpload }: Props) {
+  const { getToken } = useAuth();
   const [sources, setSources] = useState<SourceSummary[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -46,8 +47,9 @@ export default function UploadManager({ userId, onUpload }: Props) {
 
   async function fetchSources() {
     try {
+      const token = await getToken();
       const res = await fetch(`${base}/api/v1/investments/sources`, {
-        headers: { "X-User-Id": userId },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setSources(await res.json());
     } catch {
@@ -65,13 +67,14 @@ export default function UploadManager({ userId, onUpload }: Props) {
     setError(null);
     setUploading(true);
 
+    const token = await getToken();
     const form = new FormData();
     form.append("file", file);
 
     try {
       const res = await fetch(`${base}/api/v1/investments/upload`, {
         method: "POST",
-        headers: { "X-User-Id": userId },
+        headers: { Authorization: `Bearer ${token}` },
         body: form,
       });
 
@@ -92,9 +95,10 @@ export default function UploadManager({ userId, onUpload }: Props) {
   async function handleClear(source: string | null) {
     const sourceKey = source ?? "legacy";
     try {
+      const token = await getToken();
       await fetch(`${base}/api/v1/investments/sources/${sourceKey}`, {
         method: "DELETE",
-        headers: { "X-User-Id": userId },
+        headers: { Authorization: `Bearer ${token}` },
       });
       await fetchSources();
       onUpload();

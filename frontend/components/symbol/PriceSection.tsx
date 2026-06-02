@@ -106,7 +106,15 @@ function formatTooltipLabel(dateStr: string): string {
   });
 }
 
-export default function PriceSection({ ticker, companyName, exchange, sector, industry, analysisCurrency, logoUrl }: Props) {
+export default function PriceSection({
+  ticker,
+  companyName,
+  exchange,
+  sector,
+  industry,
+  analysisCurrency,
+  logoUrl,
+}: Props) {
   const [data, setData] = useState<DataState>({
     hourly: [],
     daily: [],
@@ -123,9 +131,9 @@ export default function PriceSection({ ticker, companyName, exchange, sector, in
 
     Promise.all([
       fetch(`${base}/api/v1/price/${ticker}`).then((r) => r.json()),
-      fetch(
-        `${base}/api/v1/price/${ticker}/history?days=729&interval=1h`,
-      ).then((r) => r.json()),
+      fetch(`${base}/api/v1/price/${ticker}/history?days=729&interval=1h`).then(
+        (r) => r.json(),
+      ),
       fetch(
         `${base}/api/v1/price/${ticker}/history?days=7300&interval=1day`,
       ).then((r) => r.json()),
@@ -171,14 +179,24 @@ export default function PriceSection({ ticker, companyName, exchange, sector, in
     return source.filter((p) => parseDateStr(p.date) >= cutoff);
   }, [data.hourly, data.daily, range]);
 
+  const priceDelta = useMemo(() => {
+    const n = data.daily.length;
+    if (n < 2) return null;
+    const latest = data.daily[n - 1].close;
+    const prev = data.daily[n - 2].close;
+    if (!prev) return null;
+    return ((latest - prev) / prev) * 100;
+  }, [data.daily]);
+
   if (data.loading) {
     return (
       <div className="mb-8">
-        <div className="flex items-start gap-4 mb-6">
-          <div className="w-[72px] h-[72px] flex-shrink-0 rounded-lg bg-neutral-800 animate-pulse" />
-          <div className="flex-1">
+        <div className="flex items-start gap-4 mb-10">
+          <div className="w-[100px] h-[100px] flex-shrink-0 rounded-lg bg-neutral-800 animate-pulse" />
+          <div className="flex-1 flex flex-col gap-2 pt-1">
             <div className="h-9 w-56 bg-neutral-800 rounded animate-pulse" />
-            <div className="h-4 w-64 bg-neutral-800 rounded animate-pulse mt-2" />
+            <div className="h-7 w-40 bg-neutral-800 rounded animate-pulse" />
+            <div className="h-4 w-64 bg-neutral-800 rounded animate-pulse" />
           </div>
         </div>
         <div className="h-64 bg-neutral-800 rounded animate-pulse" />
@@ -196,8 +214,8 @@ export default function PriceSection({ ticker, companyName, exchange, sector, in
 
   return (
     <div className="mb-8">
-      <div className="flex items-start gap-4 mb-6">
-        <div className="w-[72px] h-[72px] flex-shrink-0 rounded-lg bg-white overflow-hidden">
+      <div className="flex items-start gap-4 mb-10">
+        <div className="w-[100px] h-[100px] flex-shrink-0 rounded-lg bg-white overflow-hidden">
           {logoUrl && (
             <img
               src={logoUrl}
@@ -212,14 +230,39 @@ export default function PriceSection({ ticker, companyName, exchange, sector, in
               ? `${companyName} (${ticker})`
               : ticker}
           </h1>
-          <p className="text-sm text-neutral-500 mt-2">
-            {[
-              exchange ? `Exchange: ${exchange}` : null,
-              sector ? `Sector: ${sector}` : null,
-              industry ? `Industry: ${industry}` : null,
-              analysisCurrency ? `Currency: ${analysisCurrency}` : null,
-            ].filter(Boolean).join(" · ")}
-          </p>
+          {data.price !== null && (
+            <div className="flex items-baseline gap-3 mt-2">
+              <span className="text-2xl font-bold text-neutral-100">
+                ${data.price.toFixed(2)}
+                <span className="text-sm font-normal text-neutral-500 ml-1">
+                  {data.currency ?? "USD"}
+                </span>
+              </span>
+              {priceDelta !== null && (
+                <span
+                  className={`text-lg font-semibold ${priceDelta >= 0 ? "text-green-400" : "text-red-400"}`}
+                >
+                  {priceDelta >= 0 ? "+" : ""}
+                  {priceDelta.toFixed(2)}%
+                </span>
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-x-3 mt-1">
+            {[exchange, sector, industry, analysisCurrency]
+              .filter(Boolean)
+              .map((item, i, arr) => (
+                <span
+                  key={i}
+                  className="flex items-center gap-x-3 text-sm text-neutral-500"
+                >
+                  {item}
+                  {i < arr.length - 1 && (
+                    <span className="text-neutral-700">·</span>
+                  )}
+                </span>
+              ))}
+          </div>
         </div>
       </div>
       {hasData && (
@@ -243,7 +286,9 @@ export default function PriceSection({ ticker, companyName, exchange, sector, in
             {data.price !== null && (
               <p className="text-lg font-semibold text-neutral-300">
                 ${data.price.toFixed(2)}{" "}
-                <span className="text-xs text-neutral-500">{data.currency ?? "USD"}</span>
+                <span className="text-xs text-neutral-500">
+                  {data.currency ?? "USD"}
+                </span>
               </p>
             )}
           </div>
@@ -270,9 +315,7 @@ export default function PriceSection({ ticker, companyName, exchange, sector, in
                 }}
                 labelStyle={{ color: "#a3a3a3", fontSize: 12 }}
                 itemStyle={{ color: "#e5e5e5" }}
-                labelFormatter={(label) =>
-                  formatTooltipLabel(String(label))
-                }
+                labelFormatter={(label) => formatTooltipLabel(String(label))}
                 formatter={(v) => [`$${Number(v).toFixed(2)}`, "Close"]}
               />
               <Line
@@ -290,7 +333,9 @@ export default function PriceSection({ ticker, companyName, exchange, sector, in
       {!hasData && data.price !== null && (
         <p className="text-lg font-semibold text-neutral-300">
           ${data.price.toFixed(2)}{" "}
-          <span className="text-xs text-neutral-500">{data.currency ?? "USD"}</span>
+          <span className="text-xs text-neutral-500">
+            {data.currency ?? "USD"}
+          </span>
         </p>
       )}
     </div>

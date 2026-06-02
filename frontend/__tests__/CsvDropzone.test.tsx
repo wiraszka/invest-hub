@@ -2,6 +2,10 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CsvDropzone from "@/components/investments/CsvDropzone";
 
+jest.mock("@clerk/nextjs", () => ({
+  useAuth: () => ({ getToken: jest.fn().mockResolvedValue("mock-token") }),
+}));
+
 const onUpload = jest.fn();
 
 beforeEach(() => {
@@ -17,13 +21,13 @@ afterEach(() => {
 
 describe("CsvDropzone", () => {
   it("renders the upload prompt", () => {
-    render(<CsvDropzone userId="user_123" onUpload={onUpload} />);
+    render(<CsvDropzone onUpload={onUpload} />);
 
     expect(screen.getByText(/re-upload/i)).toBeInTheDocument();
   });
 
   it("calls fetch and onUpload when a csv file is selected", async () => {
-    render(<CsvDropzone userId="user_123" onUpload={onUpload} />);
+    render(<CsvDropzone onUpload={onUpload} />);
 
     const file = new File(["date,amount\n2025-01-01,100"], "activities.csv", {
       type: "text/csv",
@@ -44,7 +48,7 @@ describe("CsvDropzone", () => {
       json: async () => ({ detail: "Bad file" }),
     } as Response);
 
-    render(<CsvDropzone userId="user_123" onUpload={onUpload} />);
+    render(<CsvDropzone onUpload={onUpload} />);
 
     const file = new File(["bad"], "activities.csv", { type: "text/csv" });
     const input = screen.getByTestId("csv-file-input");

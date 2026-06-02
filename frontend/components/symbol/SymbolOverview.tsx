@@ -68,7 +68,7 @@ interface AnalysisData {
   currency: string;
   sector: string | null;
   industry: string | null;
-  financials: {
+  snapshot: {
     financials: FinancialData | null;
     profile: Profile | null;
     metrics_block: string;
@@ -170,7 +170,11 @@ function MetricRow({
   );
 }
 
-export default function SymbolOverview({ ticker, onCompanyName, onMetadata }: Props) {
+export default function SymbolOverview({
+  ticker,
+  onCompanyName,
+  onMetadata,
+}: Props) {
   const [data, setData] = useState<AnalysisData | null>(null);
   const [status, setStatus] = useState<Status>("loading");
 
@@ -186,7 +190,13 @@ export default function SymbolOverview({ ticker, onCompanyName, onMetadata }: Pr
           const parsed = await cached.json();
           setData(parsed);
           onCompanyName?.(parsed.company_name);
-          onMetadata?.({ exchange: parsed.exchange, sector: parsed.sector, industry: parsed.industry, currency: parsed.currency, logoUrl: parsed.logo_url ?? null });
+          onMetadata?.({
+            exchange: parsed.exchange,
+            sector: parsed.sector,
+            industry: parsed.industry,
+            currency: parsed.currency,
+            logoUrl: parsed.logo_url ?? null,
+          });
           setStatus("done");
           return;
         }
@@ -204,7 +214,13 @@ export default function SymbolOverview({ ticker, onCompanyName, onMetadata }: Pr
         const parsed = await generated.json();
         setData(parsed);
         onCompanyName?.(parsed.company_name);
-        onMetadata?.({ exchange: parsed.exchange, sector: parsed.sector, industry: parsed.industry, currency: parsed.currency, logoUrl: parsed.logo_url ?? null });
+        onMetadata?.({
+          exchange: parsed.exchange,
+          sector: parsed.sector,
+          industry: parsed.industry,
+          currency: parsed.currency,
+          logoUrl: parsed.logo_url ?? null,
+        });
         setStatus("done");
       } catch {
         if (!cancelled) setStatus("error");
@@ -241,8 +257,8 @@ export default function SymbolOverview({ ticker, onCompanyName, onMetadata }: Pr
     );
   }
 
-  const fin = data.financials.financials;
-  const profile = data.financials.profile;
+  const fin = data.snapshot.financials;
+  const profile = data.snapshot.profile;
   const description = profile?.description ?? null;
   const metrics = fin?.metrics ?? null;
 

@@ -1,20 +1,20 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useRef, useState } from "react";
 
 interface Props {
-  userId: string;
   onUpload: () => void;
   label?: string;
   uploaded?: boolean;
 }
 
 export default function CsvDropzone({
-  userId,
   onUpload,
   label = "↑ Re-upload",
   uploaded = false,
 }: Props) {
+  const { getToken } = useAuth();
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +24,7 @@ export default function CsvDropzone({
     setError(null);
     setLoading(true);
 
+    const token = await getToken();
     const form = new FormData();
     form.append("file", file);
 
@@ -32,7 +33,7 @@ export default function CsvDropzone({
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/investments/upload`,
         {
           method: "POST",
-          headers: { "X-User-Id": userId },
+          headers: { Authorization: `Bearer ${token}` },
           body: form,
         },
       );
