@@ -36,7 +36,9 @@ class TestGetQuote:
         assert response.provider == "twelvedata"
         assert response.error is None
 
-    async def test_returns_error_on_http_failure(self, adapter: TwelveDataAdapter) -> None:
+    async def test_returns_error_on_http_failure(
+        self, adapter: TwelveDataAdapter
+    ) -> None:
         mock_response = MagicMock()
         mock_response.is_success = False
         mock_response.status_code = 429
@@ -53,7 +55,9 @@ class TestGetQuote:
         assert response.data is None
         assert response.error is not None
 
-    async def test_returns_error_on_missing_price_field(self, adapter: TwelveDataAdapter) -> None:
+    async def test_returns_error_on_missing_price_field(
+        self, adapter: TwelveDataAdapter
+    ) -> None:
         mock_response = MagicMock()
         mock_response.is_success = True
         mock_response.json.return_value = {"message": "Rate limit exceeded"}
@@ -83,7 +87,9 @@ class TestGetQuote:
         assert response.data is None
         assert response.error is not None
 
-    async def test_returns_error_when_circuit_is_open(self, adapter: TwelveDataAdapter) -> None:
+    async def test_returns_error_when_circuit_is_open(
+        self, adapter: TwelveDataAdapter
+    ) -> None:
         adapter._circuit._failures = adapter._circuit.failure_threshold
         adapter._circuit._opened_at = time.monotonic()
 
@@ -120,7 +126,9 @@ class TestGetPriceHistory:
         assert response.data.history[0].date == "2024-01-01"
         assert response.data.history[0].close == 184.00
 
-    async def test_returns_error_on_missing_values_key(self, adapter: TwelveDataAdapter) -> None:
+    async def test_returns_error_on_missing_values_key(
+        self, adapter: TwelveDataAdapter
+    ) -> None:
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {"message": "Invalid API key"}
@@ -137,7 +145,9 @@ class TestGetPriceHistory:
         assert response.data is None
         assert response.error is not None
 
-    async def test_returns_error_when_circuit_is_open(self, adapter: TwelveDataAdapter) -> None:
+    async def test_returns_error_when_circuit_is_open(
+        self, adapter: TwelveDataAdapter
+    ) -> None:
         adapter._circuit._failures = adapter._circuit.failure_threshold
         adapter._circuit._opened_at = time.monotonic()
 
@@ -148,7 +158,9 @@ class TestGetPriceHistory:
 
 
 class TestUnsupportedMethods:
-    async def test_get_financials_returns_error(self, adapter: TwelveDataAdapter) -> None:
+    async def test_get_financials_returns_error(
+        self, adapter: TwelveDataAdapter
+    ) -> None:
         response = await adapter.get_financials("AAPL")
 
         assert response.data is None

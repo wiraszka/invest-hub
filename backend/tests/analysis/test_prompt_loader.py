@@ -7,6 +7,26 @@ import pytest
 from services.analysis.prompt_loader import load, valid_template_keys
 
 _ALL_KEYS = [
+    # Stock — revenue-generating
+    "general",
+    "mining",
+    "energy",
+    "tech",
+    "biotech",
+    "financial",
+    "reit",
+    # Stock — pre-revenue
+    "pre_revenue",
+    "pre_revenue_mining",
+    "pre_revenue_biotech",
+    # ETF
+    "etf",
+    "etf_equity_broad",
+    "etf_equity_sector",
+    "etf_fixed_income_government",
+    "etf_fixed_income_credit",
+    "etf_commodity",
+    # Legacy long-form keys
     "pre-revenue/general",
     "pre-revenue/mining",
     "revenue-generating/general",
@@ -16,7 +36,8 @@ _ALL_KEYS = [
 
 _PROMPTS_AVAILABLE = (Path(__file__).parents[4] / "llm-prompts").exists()
 _skip_without_prompts = pytest.mark.skipif(
-    not _PROMPTS_AVAILABLE, reason="llm-prompts directory not present in this environment"
+    not _PROMPTS_AVAILABLE,
+    reason="llm-prompts directory not present in this environment",
 )
 
 

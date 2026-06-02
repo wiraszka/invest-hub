@@ -1,11 +1,28 @@
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.index import app
+from core.auth import get_current_user_id
 from services.investments import build_positions, parse_csv
 
+_TEST_USER = "user_test123"
+
+# Override the JWT dependency for the authenticated client — no real Clerk token needed.
+app.dependency_overrides[get_current_user_id] = lambda: _TEST_USER
+
 client = TestClient(app)
+
+
+@pytest.fixture()
+def no_auth_client():
+    """TestClient with the auth dependency override removed — tests 401 behaviour."""
+    app.dependency_overrides.pop(get_current_user_id, None)
+    yield TestClient(app)
+    # Restore override so other tests are unaffected
+    app.dependency_overrides[get_current_user_id] = lambda: _TEST_USER
+
 
 # ---------------------------------------------------------------------------
 # CSV fixtures
@@ -178,12 +195,12 @@ def test_build_positions_cleans_option_symbol():
 
 
 def test_upload_activities_returns_count_and_type():
-    with patch("routers.investments.replace_transactions_for_source", new=AsyncMock()) as mock_replace:
-
+    with patch(
+        "routers.investments.replace_transactions_for_source", new=AsyncMock()
+    ) as mock_replace:
         response = client.post(
             "/api/v1/investments/upload",
             files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -194,11 +211,12 @@ def test_upload_activities_returns_count_and_type():
 
 
 def test_upload_activities_tags_source_as_wealthsimple():
-    with patch("routers.investments.replace_transactions_for_source", new=AsyncMock()) as mock_replace:
+    with patch(
+        "routers.investments.replace_transactions_for_source", new=AsyncMock()
+    ) as mock_replace:
         client.post(
             "/api/v1/investments/upload",
             files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
-            headers={"X-User-Id": "user_test123"},
         )
 
     call_args = mock_replace.call_args[0]
@@ -210,7 +228,6 @@ def test_upload_holdings_returns_count_and_type():
         response = client.post(
             "/api/v1/investments/upload",
             files={"file": ("holdings.csv", HOLDINGS_CSV.encode(), "text/csv")},
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -220,8 +237,8 @@ def test_upload_holdings_returns_count_and_type():
     mock_set.assert_called_once()
 
 
-def test_upload_requires_user_id():
-    response = client.post(
+def test_upload_requires_auth(no_auth_client):
+    response = no_auth_client.post(
         "/api/v1/investments/upload",
         files={"file": ("activities.csv", MINIMAL_CSV.encode(), "text/csv")},
     )
@@ -229,27 +246,34 @@ def test_upload_requires_user_id():
     assert response.status_code == 401
 
 
-def test_get_positions_requires_user_id():
-    response = client.get("/api/v1/investments/positions")
+def test_get_positions_requires_auth(no_auth_client):
+    response = no_auth_client.get("/api/v1/investments/positions")
 
     assert response.status_code == 401
 
 
-def test_get_sources_requires_user_id():
-    response = client.get("/api/v1/investments/sources")
+def test_get_sources_requires_auth(no_auth_client):
+    response = no_auth_client.get("/api/v1/investments/sources")
 
     assert response.status_code == 401
 
 
 def test_get_sources_returns_list():
     mock_sources = [
-        {"source": "wealthsimple", "count": 45, "min_date": "2024-01-15", "max_date": "2025-03-26"}
+        {
+            "source": "wealthsimple",
+            "count": 45,
+            "min_date": "2024-01-15",
+            "max_date": "2025-03-26",
+        }
     ]
 
-    with patch("routers.investments.get_transaction_sources", new=AsyncMock(return_value=mock_sources)):
+    with patch(
+        "routers.investments.get_transaction_sources",
+        new=AsyncMock(return_value=mock_sources),
+    ):
         response = client.get(
             "/api/v1/investments/sources",
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -258,17 +282,18 @@ def test_get_sources_returns_list():
     assert data[0]["count"] == 45
 
 
-def test_delete_source_requires_user_id():
-    response = client.delete("/api/v1/investments/sources/wealthsimple")
+def test_delete_source_requires_auth(no_auth_client):
+    response = no_auth_client.delete("/api/v1/investments/sources/wealthsimple")
 
     assert response.status_code == 401
 
 
 def test_delete_source_clears_transactions():
-    with patch("routers.investments.clear_transactions_for_source", new=AsyncMock()) as mock_clear:
+    with patch(
+        "routers.investments.clear_transactions_for_source", new=AsyncMock()
+    ) as mock_clear:
         response = client.delete(
             "/api/v1/investments/sources/wealthsimple",
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -276,23 +301,24 @@ def test_delete_source_clears_transactions():
 
 
 def test_delete_legacy_source_passes_none():
-    with patch("routers.investments.clear_transactions_for_source", new=AsyncMock()) as mock_clear:
+    with patch(
+        "routers.investments.clear_transactions_for_source", new=AsyncMock()
+    ) as mock_clear:
         client.delete(
             "/api/v1/investments/sources/legacy",
-            headers={"X-User-Id": "user_test123"},
         )
 
     mock_clear.assert_called_once_with("user_test123", None)
 
 
-def test_get_transactions_requires_user_id():
-    response = client.get("/api/v1/investments/transactions")
+def test_get_transactions_requires_auth(no_auth_client):
+    response = no_auth_client.get("/api/v1/investments/transactions")
 
     assert response.status_code == 401
 
 
-def test_get_holdings_requires_user_id():
-    response = client.get("/api/v1/investments/holdings")
+def test_get_holdings_requires_auth(no_auth_client):
+    response = no_auth_client.get("/api/v1/investments/holdings")
 
     assert response.status_code == 401
 
@@ -300,10 +326,11 @@ def test_get_holdings_requires_user_id():
 def test_get_holdings_returns_list():
     mock_holdings = [{"account": "TFSA", "symbol": "VFV", "market_value_cad": 735.0}]
 
-    with patch("routers.investments.get_holdings", new=AsyncMock(return_value=mock_holdings)):
+    with patch(
+        "routers.investments.get_holdings", new=AsyncMock(return_value=mock_holdings)
+    ):
         response = client.get(
             "/api/v1/investments/holdings",
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -314,7 +341,6 @@ def test_get_holdings_returns_empty_list_when_no_holdings():
     with patch("routers.investments.get_holdings", new=AsyncMock(return_value=[])):
         response = client.get(
             "/api/v1/investments/holdings",
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -339,10 +365,11 @@ def test_get_positions_returns_list():
         }
     ]
 
-    with patch("routers.investments.get_transactions", new=AsyncMock(return_value=mock_txns)):
+    with patch(
+        "routers.investments.get_transactions", new=AsyncMock(return_value=mock_txns)
+    ):
         response = client.get(
             "/api/v1/investments/positions",
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -368,10 +395,11 @@ def test_get_transactions_returns_list():
         }
     ]
 
-    with patch("routers.investments.get_transactions", new=AsyncMock(return_value=mock_txns)):
+    with patch(
+        "routers.investments.get_transactions", new=AsyncMock(return_value=mock_txns)
+    ):
         response = client.get(
             "/api/v1/investments/transactions",
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -383,8 +411,8 @@ def test_get_transactions_returns_list():
 # ---------------------------------------------------------------------------
 
 
-def test_get_preferences_requires_user_id():
-    response = client.get("/api/v1/investments/preferences")
+def test_get_preferences_requires_auth(no_auth_client):
+    response = no_auth_client.get("/api/v1/investments/preferences")
 
     assert response.status_code == 401
 
@@ -392,15 +420,16 @@ def test_get_preferences_requires_user_id():
 def test_get_preferences_returns_defaults_when_none_stored():
     with patch(
         "routers.investments.get_user_preferences",
-        new=AsyncMock(return_value={
-            "grouping_labels": [],
-            "grouping_assignments": {},
-            "sector_overrides": {},
-        }),
+        new=AsyncMock(
+            return_value={
+                "grouping_labels": [],
+                "grouping_assignments": {},
+                "sector_overrides": {},
+            }
+        ),
     ):
         response = client.get(
             "/api/v1/investments/preferences",
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -410,8 +439,8 @@ def test_get_preferences_returns_defaults_when_none_stored():
     assert data["sector_overrides"] == {}
 
 
-def test_put_preferences_requires_user_id():
-    response = client.put(
+def test_put_preferences_requires_auth(no_auth_client):
+    response = no_auth_client.put(
         "/api/v1/investments/preferences",
         json={"grouping_labels": ["Tech"]},
     )
@@ -426,11 +455,12 @@ def test_put_preferences_persists_and_returns_prefs():
         "sector_overrides": {"TFSA::ARX": "Oil & Gas"},
     }
 
-    with patch("routers.investments.upsert_user_preferences", new=AsyncMock()) as mock_upsert:
+    with patch(
+        "routers.investments.upsert_user_preferences", new=AsyncMock()
+    ) as mock_upsert:
         response = client.put(
             "/api/v1/investments/preferences",
             json=prefs,
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200
@@ -446,7 +476,6 @@ def test_put_preferences_strips_unknown_keys():
         response = client.put(
             "/api/v1/investments/preferences",
             json={"grouping_labels": ["Tech"], "malicious_key": "bad"},
-            headers={"X-User-Id": "user_test123"},
         )
 
     assert response.status_code == 200

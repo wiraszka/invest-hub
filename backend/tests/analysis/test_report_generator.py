@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from services.analysis.context_builder import StructuredContext
@@ -13,7 +14,7 @@ def _make_context() -> StructuredContext:
         company_name="Apple Inc.",
         exchange="NASDAQ",
         currency="USD",
-        canonical_id="abc-123",
+        security_id="abc-123",
         template_key="general",
         sector="Technology",
         industry="Software",
@@ -43,7 +44,9 @@ class TestGenerate:
     async def test_returns_report_markdown(self) -> None:
         expected_markdown = "### Company Snapshot\n- Apple makes iPhones."
 
-        with patch("services.analysis.report_generator.get_client") as mock_get_client:
+        with patch(
+            "services.analysis.report_generator.get_anthropic_client"
+        ) as mock_get_client:
             mock_client = MagicMock()
             mock_client.messages.stream = _make_stream_mock(expected_markdown)
             mock_get_client.return_value = mock_client
@@ -60,7 +63,9 @@ class TestGenerate:
     async def test_appends_merger_notice_when_not_independent(self) -> None:
         base_markdown = "### Company Snapshot\n- A company."
 
-        with patch("services.analysis.report_generator.get_client") as mock_get_client:
+        with patch(
+            "services.analysis.report_generator.get_anthropic_client"
+        ) as mock_get_client:
             mock_client = MagicMock()
             mock_client.messages.stream = _make_stream_mock(base_markdown)
             mock_get_client.return_value = mock_client
@@ -77,7 +82,9 @@ class TestGenerate:
     async def test_no_merger_notice_for_independent(self) -> None:
         base_markdown = "### Company Snapshot\n- A company."
 
-        with patch("services.analysis.report_generator.get_client") as mock_get_client:
+        with patch(
+            "services.analysis.report_generator.get_anthropic_client"
+        ) as mock_get_client:
             mock_client = MagicMock()
             mock_client.messages.stream = _make_stream_mock(base_markdown)
             mock_get_client.return_value = mock_client
@@ -98,7 +105,9 @@ class TestGenerate:
         @asynccontextmanager
         async def _capturing_stream(*args, **kwargs):
             captured["kwargs"] = kwargs
-            usage = MagicMock(input_tokens=100, output_tokens=50, cache_read_input_tokens=0)
+            usage = MagicMock(
+                input_tokens=100, output_tokens=50, cache_read_input_tokens=0
+            )
             final_message = MagicMock()
             final_message.usage = usage
             stream = MagicMock()
@@ -106,7 +115,9 @@ class TestGenerate:
             stream.get_final_message = AsyncMock(return_value=final_message)
             yield stream
 
-        with patch("services.analysis.report_generator.get_client") as mock_get_client:
+        with patch(
+            "services.analysis.report_generator.get_anthropic_client"
+        ) as mock_get_client:
             mock_client = MagicMock()
             mock_client.messages.stream = _capturing_stream
             mock_get_client.return_value = mock_client
@@ -127,7 +138,9 @@ class TestGenerate:
         @asynccontextmanager
         async def _capturing_stream(*args, **kwargs):
             captured["kwargs"] = kwargs
-            usage = MagicMock(input_tokens=100, output_tokens=50, cache_read_input_tokens=0)
+            usage = MagicMock(
+                input_tokens=100, output_tokens=50, cache_read_input_tokens=0
+            )
             final_message = MagicMock()
             final_message.usage = usage
             stream = MagicMock()
@@ -135,7 +148,9 @@ class TestGenerate:
             stream.get_final_message = AsyncMock(return_value=final_message)
             yield stream
 
-        with patch("services.analysis.report_generator.get_client") as mock_get_client:
+        with patch(
+            "services.analysis.report_generator.get_anthropic_client"
+        ) as mock_get_client:
             mock_client = MagicMock()
             mock_client.messages.stream = _capturing_stream
             mock_get_client.return_value = mock_client
@@ -148,7 +163,10 @@ class TestGenerate:
             )
 
         system_blocks = captured["kwargs"]["system"]
-        assert any(block.get("cache_control") == {"type": "ephemeral"} for block in system_blocks)
+        assert any(
+            block.get("cache_control") == {"type": "ephemeral"}
+            for block in system_blocks
+        )
 
     async def test_user_message_contains_metrics_and_filing(self) -> None:
         context = _make_context()
@@ -157,7 +175,9 @@ class TestGenerate:
         @asynccontextmanager
         async def _capturing_stream(*args, **kwargs):
             captured["kwargs"] = kwargs
-            usage = MagicMock(input_tokens=100, output_tokens=50, cache_read_input_tokens=0)
+            usage = MagicMock(
+                input_tokens=100, output_tokens=50, cache_read_input_tokens=0
+            )
             final_message = MagicMock()
             final_message.usage = usage
             stream = MagicMock()
@@ -165,7 +185,9 @@ class TestGenerate:
             stream.get_final_message = AsyncMock(return_value=final_message)
             yield stream
 
-        with patch("services.analysis.report_generator.get_client") as mock_get_client:
+        with patch(
+            "services.analysis.report_generator.get_anthropic_client"
+        ) as mock_get_client:
             mock_client = MagicMock()
             mock_client.messages.stream = _capturing_stream
             mock_get_client.return_value = mock_client
@@ -181,6 +203,86 @@ class TestGenerate:
         assert context.metrics_block in user_content
         assert context.filing_excerpt in user_content
 
+    async def test_leadership_and_market_intelligence_included_when_present(
+        self,
+    ) -> None:
+        context = replace(
+            _make_context(),
+            leadership_block="--- Leadership & Governance ---\n  CEO  Tim Cook",
+            market_intelligence_block="--- Analyst Consensus ---\n  Recommendation: buy",
+        )
+        captured: dict = {}
+
+        @asynccontextmanager
+        async def _capturing_stream(*args, **kwargs):
+            captured["kwargs"] = kwargs
+            usage = MagicMock(
+                input_tokens=100, output_tokens=50, cache_read_input_tokens=0
+            )
+            final_message = MagicMock()
+            final_message.usage = usage
+            stream = MagicMock()
+            stream.get_final_text = AsyncMock(return_value="report")
+            stream.get_final_message = AsyncMock(return_value=final_message)
+            yield stream
+
+        with patch(
+            "services.analysis.report_generator.get_anthropic_client"
+        ) as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.messages.stream = _capturing_stream
+            mock_get_client.return_value = mock_client
+
+            await generate(
+                context=context,
+                prompt_template="template",
+                report_template_key="revenue-generating/general",
+                independence="independent",
+            )
+
+        user_content = captured["kwargs"]["messages"][0]["content"]
+        assert "=== LEADERSHIP & GOVERNANCE ===" in user_content
+        assert "Tim Cook" in user_content
+        assert "=== MARKET INTELLIGENCE ===" in user_content
+        assert "buy" in user_content
+
+    async def test_empty_leadership_blocks_omitted_from_user_message(self) -> None:
+        context = (
+            _make_context()
+        )  # leadership_block and market_intelligence_block are "" by default
+        captured: dict = {}
+
+        @asynccontextmanager
+        async def _capturing_stream(*args, **kwargs):
+            captured["kwargs"] = kwargs
+            usage = MagicMock(
+                input_tokens=100, output_tokens=50, cache_read_input_tokens=0
+            )
+            final_message = MagicMock()
+            final_message.usage = usage
+            stream = MagicMock()
+            stream.get_final_text = AsyncMock(return_value="report")
+            stream.get_final_message = AsyncMock(return_value=final_message)
+            yield stream
+
+        with patch(
+            "services.analysis.report_generator.get_anthropic_client"
+        ) as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.messages.stream = _capturing_stream
+            mock_get_client.return_value = mock_client
+
+            await generate(
+                context=context,
+                prompt_template="template",
+                report_template_key="revenue-generating/general",
+                independence="independent",
+            )
+
+        user_content = captured["kwargs"]["messages"][0]["content"]
+        assert "=== LEADERSHIP & GOVERNANCE ===" not in user_content
+        assert "=== MARKET INTELLIGENCE ===" not in user_content
+
     async def test_empty_filing_uses_fallback_message(self) -> None:
         context = _make_context()
         context.filing_excerpt = ""
@@ -189,7 +291,9 @@ class TestGenerate:
         @asynccontextmanager
         async def _capturing_stream(*args, **kwargs):
             captured["kwargs"] = kwargs
-            usage = MagicMock(input_tokens=100, output_tokens=50, cache_read_input_tokens=0)
+            usage = MagicMock(
+                input_tokens=100, output_tokens=50, cache_read_input_tokens=0
+            )
             final_message = MagicMock()
             final_message.usage = usage
             stream = MagicMock()
@@ -197,7 +301,9 @@ class TestGenerate:
             stream.get_final_message = AsyncMock(return_value=final_message)
             yield stream
 
-        with patch("services.analysis.report_generator.get_client") as mock_get_client:
+        with patch(
+            "services.analysis.report_generator.get_anthropic_client"
+        ) as mock_get_client:
             mock_client = MagicMock()
             mock_client.messages.stream = _capturing_stream
             mock_get_client.return_value = mock_client

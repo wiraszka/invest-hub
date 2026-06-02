@@ -22,7 +22,7 @@ def _make_context(
         company_name="Apple Inc.",
         exchange="NASDAQ",
         currency="USD",
-        canonical_id="abc-123",
+        security_id="abc-123",
         template_key=template_key,
         sector=sector,
         industry=industry,
@@ -31,10 +31,15 @@ def _make_context(
     )
 
 
-def _mock_llm_response(content: str) -> MagicMock:
+def _mock_groq_response(content: str) -> MagicMock:
+    """Build a mock that matches the Groq chat.completions.create response shape."""
     message = MagicMock()
-    message.content = [MagicMock(text=content)]
-    return message
+    message.content = content
+    choice = MagicMock()
+    choice.message = message
+    response = MagicMock()
+    response.choices = [choice]
+    return response
 
 
 class TestDetectIndependenceRegex:
@@ -42,7 +47,9 @@ class TestDetectIndependenceRegex:
         assert _detect_independence_regex("Normal annual operations.") is None
 
     def test_detects_confirmed_inactive_on_acquired(self) -> None:
-        result = _detect_independence_regex("The company was acquired by BigCorp in Q3.")
+        result = _detect_independence_regex(
+            "The company was acquired by BigCorp in Q3."
+        )
         assert result == "confirmed_inactive"
 
     def test_detects_confirmed_inactive_on_delisted(self) -> None:
@@ -54,7 +61,9 @@ class TestDetectIndependenceRegex:
         assert result == "possibly_acquired"
 
     def test_detects_possibly_acquired_on_pending_acquisition(self) -> None:
-        result = _detect_independence_regex("The pending acquisition by MegaCo is expected to close in Q2.")
+        result = _detect_independence_regex(
+            "The pending acquisition by MegaCo is expected to close in Q2."
+        )
         assert result == "possibly_acquired"
 
     def test_is_case_insensitive(self) -> None:
@@ -64,7 +73,12 @@ class TestDetectIndependenceRegex:
 
 class TestExtractTargetedWindow:
     def test_returns_window_around_keyword(self) -> None:
-        text = "Some intro. " + "x" * 500 + " Segment revenue breakdown: Tech 100M, Services 50M." + " y" * 500
+        text = (
+            "Some intro. "
+            + "x" * 500
+            + " Segment revenue breakdown: Tech 100M, Services 50M."
+            + " y" * 500
+        )
         result = _extract_targeted_window(text, "general")
         assert "Segment revenue breakdown" in result
         assert len(result) <= 1600
@@ -75,7 +89,12 @@ class TestExtractTargetedWindow:
         assert result == text[:500]
 
     def test_uses_template_specific_keywords(self) -> None:
-        text = "Background text. " + "x" * 200 + " Proven mineral reserves: Gold 500koz." + " y" * 500
+        text = (
+            "Background text. "
+            + "x" * 200
+            + " Proven mineral reserves: Gold 500koz."
+            + " y" * 500
+        )
         result = _extract_targeted_window(text, "mining")
         assert "mineral reserves" in result
 
@@ -84,9 +103,11 @@ class TestAnalyze:
     async def test_returns_independence_and_chart_data(self) -> None:
         json_response = '{"independence": "independent", "chart_data": {"revenue_by_segment": null}}'
 
-        with patch("services.analysis.analyzer.get_client") as mock_get_client:
+        with patch("services.analysis.analyzer.get_groq_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client.messages.create = AsyncMock(return_value=_mock_llm_response(json_response))
+            mock_client.chat.completions.create = AsyncMock(
+                return_value=_mock_groq_response(json_response)
+            )
             mock_get_client.return_value = mock_client
 
             result = await analyze(_make_context(template_key="general"))
@@ -99,7 +120,7 @@ class TestAnalyze:
         filing = "The company has been acquired by BigCorp."
         context = _make_context(template_key="pre_revenue", filing_excerpt=filing)
 
-        with patch("services.analysis.analyzer.get_client") as mock_get_client:
+        with patch("services.analysis.analyzer.get_groq_client") as mock_get_client:
             result = await analyze(context)
             mock_get_client.assert_not_called()
 
@@ -110,7 +131,7 @@ class TestAnalyze:
         filing = "This ETF was delisted last quarter."
         context = _make_context(template_key="etf", filing_excerpt=filing)
 
-        with patch("services.analysis.analyzer.get_client") as mock_get_client:
+        with patch("services.analysis.analyzer.get_groq_client") as mock_get_client:
             result = await analyze(context)
             mock_get_client.assert_not_called()
 
@@ -121,23 +142,29 @@ class TestAnalyze:
         context = _make_context(template_key="mining", filing_excerpt=filing)
         json_response = '{"independence": "confirmed_inactive", "chart_data": {"reserves_by_asset": {"Gold": 500000}}}'
 
-        with patch("services.analysis.analyzer.get_client") as mock_get_client:
+        with patch("services.analysis.analyzer.get_groq_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client.messages.create = AsyncMock(return_value=_mock_llm_response(json_response))
+            mock_client.chat.completions.create = AsyncMock(
+                return_value=_mock_groq_response(json_response)
+            )
             mock_get_client.return_value = mock_client
 
             result = await analyze(context)
-            mock_client.messages.create.assert_called_once()
+            mock_client.chat.completions.create.assert_called_once()
 
         assert result["independence"] == "confirmed_inactive"
         assert result["chart_data"].get("reserves_by_asset") is not None
 
-    async def test_invalid_independence_from_llm_falls_back_to_independent(self) -> None:
+    async def test_invalid_independence_from_llm_falls_back_to_independent(
+        self,
+    ) -> None:
         json_response = '{"independence": "completely_wrong", "chart_data": {}}'
 
-        with patch("services.analysis.analyzer.get_client") as mock_get_client:
+        with patch("services.analysis.analyzer.get_groq_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client.messages.create = AsyncMock(return_value=_mock_llm_response(json_response))
+            mock_client.chat.completions.create = AsyncMock(
+                return_value=_mock_groq_response(json_response)
+            )
             mock_get_client.return_value = mock_client
 
             result = await analyze(_make_context(template_key="general"))
@@ -145,9 +172,11 @@ class TestAnalyze:
         assert result["independence"] == "independent"
 
     async def test_falls_back_gracefully_on_malformed_json(self) -> None:
-        with patch("services.analysis.analyzer.get_client") as mock_get_client:
+        with patch("services.analysis.analyzer.get_groq_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client.messages.create = AsyncMock(return_value=_mock_llm_response("not json at all"))
+            mock_client.chat.completions.create = AsyncMock(
+                return_value=_mock_groq_response("not json at all")
+            )
             mock_get_client.return_value = mock_client
 
             result = await analyze(_make_context(template_key="general"))
@@ -156,9 +185,11 @@ class TestAnalyze:
         assert result["chart_data"] == {}
 
     async def test_falls_back_gracefully_on_llm_exception(self) -> None:
-        with patch("services.analysis.analyzer.get_client") as mock_get_client:
+        with patch("services.analysis.analyzer.get_groq_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client.messages.create = AsyncMock(side_effect=RuntimeError("API error"))
+            mock_client.chat.completions.create = AsyncMock(
+                side_effect=RuntimeError("API error")
+            )
             mock_get_client.return_value = mock_client
 
             result = await analyze(_make_context(template_key="general"))
@@ -170,9 +201,11 @@ class TestAnalyze:
         context = _make_context(template_key="general", filing_excerpt="")
         json_response = '{"independence": "possibly_acquired", "chart_data": {}}'
 
-        with patch("services.analysis.analyzer.get_client") as mock_get_client:
+        with patch("services.analysis.analyzer.get_groq_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client.messages.create = AsyncMock(return_value=_mock_llm_response(json_response))
+            mock_client.chat.completions.create = AsyncMock(
+                return_value=_mock_groq_response(json_response)
+            )
             mock_get_client.return_value = mock_client
 
             result = await analyze(context)
@@ -180,17 +213,21 @@ class TestAnalyze:
         assert result["independence"] == "possibly_acquired"
 
     async def test_targeted_window_passed_to_llm_not_full_text(self) -> None:
-        long_text = "Annual report. " + "x" * 3000 + " Segment revenue: North America 500M."
+        long_text = (
+            "Annual report. " + "x" * 3000 + " Segment revenue: North America 500M."
+        )
         context = _make_context(template_key="general", filing_excerpt=long_text)
         json_response = '{"independence": "independent", "chart_data": {"revenue_by_segment": null}}'
 
-        with patch("services.analysis.analyzer.get_client") as mock_get_client:
+        with patch("services.analysis.analyzer.get_groq_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client.messages.create = AsyncMock(return_value=_mock_llm_response(json_response))
+            mock_client.chat.completions.create = AsyncMock(
+                return_value=_mock_groq_response(json_response)
+            )
             mock_get_client.return_value = mock_client
 
             await analyze(context)
-            call_kwargs = mock_client.messages.create.call_args.kwargs
-            user_content = call_kwargs["messages"][0]["content"]
+            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+            user_content = call_kwargs["messages"][1]["content"]
 
         assert len(user_content) < len(long_text)
