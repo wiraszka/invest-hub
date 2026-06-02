@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.21.0] - 2026-06-02
+
+### Added
+
+- Split analysis into five independent, cacheable phases — P1 (providers), P2 (SEC filing), P3 (format), P4 (independence analysis), P5 (report); each has its own `/api/v1/analysis/{ticker}/` endpoint and can be run, cached, or forced individually
+- Leadership and governance data injected into report context — officer names, titles, age, and compensation; insider and institutional ownership percentages; governance risk scores (audit, board, compensation) sourced from yfinance; drives Management Quality section accuracy
+- Analyst consensus and market intelligence injected into report context — recommendation, score, and analyst count; price targets (mean, median, high, low); short interest (shares short, days to cover, % of float); 52-week range and moving averages; drives Market Sentiment and Key Investment Debate sections
+- Extended financial metrics in the LLM context — forward P/E, PEG ratio, revenue and earnings growth rates, dividend rate and payout ratio, beta, ROA, debt/equity, quick ratio, current ratio, FCF yield
+- Sector peer companies from Finnhub — up to 8 cleaned peer tickers stored in `market_intelligence` and injected as `--- Peer Companies ---` context for Competitive Position sections; cross-listed self-references and duplicates removed
+- New report templates: biotech (revenue-generating and pre-revenue), REIT, and five ETF types (equity broad, equity sector, fixed-income government, fixed-income credit, commodity); full 3-level template taxonomy (ETF/stock → asset class → industry)
+- All provider data now stored in normalized relational columns — `structured_context` JSONB blob removed; leadership and market intelligence in dedicated tables; financials extended with 15 new metric columns; profiles table added; DB migrations 0006–0010
+
 ## [v1.20.0] - 2026-05-21
 
 ### Added
@@ -13,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Symbol page header redesign: company name with ticker in parentheses on the top line, sector/industry/exchange/currency metadata on the row below, price quote aligned to the chart range controls — layout is fully set before analysis data loads with no shifting
 - Price quote on symbol pages now shows the correct currency (CAD for .TO and .V tickers) instead of always displaying USD
 - Symbol search in the sidebar — type a ticker or company name to navigate directly to any symbol page
-- Full analysis pipeline on the hexagonal adapter architecture: TwelveData, yfinance, FMP, Finnhub, SEC, and OpenFIGI adapters with per-adapter circuit breakers and TTL caching; phase 1 collects and classifies data, phase 2.5 runs independence detection via Haiku, phase 2 generates the written report via Sonnet
+- Full analysis pipeline on the hexagonal adapter architecture: TwelveData, yfinance, FMP, Finnhub, SEC, and OpenFIGI adapters with per-adapter circuit breakers and TTL caching; phase 1 collects and classifies data, phase 2.5 runs independence detection via Groq (Llama 3.1 8B), phase 2 generates the written report via Sonnet
 
 ### Changed
 
@@ -265,7 +277,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Refactor LLM analysis pipeline: replace single monolithic call with two focused calls (Haiku for classification + chart JSON extraction, Sonnet for Company Snapshot prose)
+- Refactor LLM analysis pipeline: replace single monolithic call with two focused calls (Groq Llama 3.1 8B for classification + chart JSON extraction, Sonnet for Company Snapshot prose)
 - Extract only relevant 10-K sections (Item 1, 1A, 7) instead of full document, reducing input from 100k to ~24k chars
 - Replace LLM-generated charts with structured data pipeline: XBRL API for standard financials, targeted LLM extraction for industry-specific fields
 - Store `snapshot`, `chart_data`, `xbrl_data`, and `market_cap_usd` as discrete fields instead of a single markdown blob
@@ -314,6 +326,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build Next.js frontend with Clerk authentication and sidebar navigation
 - Restructure repository as a monorepo with separate `backend/` and `frontend/` directories
 
+[v1.21.0]: https://github.com/wiraszka/invest-hub/compare/v1.20.0...v1.21.0
+[v1.20.0]: https://github.com/wiraszka/invest-hub/compare/v1.19.0...v1.20.0
+[v1.19.0]: https://github.com/wiraszka/invest-hub/compare/v1.18.0...v1.19.0
+[v1.18.0]: https://github.com/wiraszka/invest-hub/compare/v1.17.0...v1.18.0
 [v1.17.0]: https://github.com/wiraszka/invest-hub/compare/v1.16.0...v1.17.0
 [v1.16.0]: https://github.com/wiraszka/invest-hub/compare/v1.15.0...v1.16.0
 [v1.15.0]: https://github.com/wiraszka/invest-hub/compare/v1.14.0...v1.15.0
