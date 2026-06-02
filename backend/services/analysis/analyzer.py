@@ -2,9 +2,10 @@
 
 Template classification lives in context_builder._classify_template() (pure Python).
 This module focuses only on:
-  1. Independence detection (regex first, Haiku fallback when inconclusive)
+  1. Independence detection (regex first, Groq fallback when inconclusive)
   2. Chart data extraction (keyword-targeted filing excerpt, scoped to template)
 """
+
 from __future__ import annotations
 
 import json
@@ -12,11 +13,13 @@ import logging
 import re
 
 from services.analysis.context_builder import StructuredContext
-from services.llm import CLASSIFY_MODEL, get_client
+from services.llm import CLASSIFY_MODEL_GROQ, get_groq_client
 
 logger = logging.getLogger(__name__)
 
-_VALID_INDEPENDENCE = frozenset({"independent", "possibly_acquired", "confirmed_inactive"})
+_VALID_INDEPENDENCE = frozenset(
+    {"independent", "possibly_acquired", "confirmed_inactive"}
+)
 
 _INACTIVE_RE = re.compile(
     r"\b(acquired\s+by|been\s+acquired|completed\s+(?:the\s+)?acquisition|"
@@ -33,7 +36,12 @@ _PENDING_RE = re.compile(
 
 # Chart data fields available per template
 _CHART_FIELDS: dict[str, list[str]] = {
-    "mining": ["revenue_by_segment", "reserves_by_asset", "production_mix", "nav_vs_ev"],
+    "mining": [
+        "revenue_by_segment",
+        "reserves_by_asset",
+        "production_mix",
+        "nav_vs_ev",
+    ],
     "pre_revenue_mining": ["reserves_by_asset", "production_mix", "nav_vs_ev"],
     "energy": ["revenue_by_segment", "production_mix"],
     "general": ["revenue_by_segment"],
@@ -47,8 +55,21 @@ _CHART_FIELDS: dict[str, list[str]] = {
 
 # Filing excerpt search keywords per template (searched in order; first match wins)
 _SEARCH_KEYWORDS: dict[str, list[str]] = {
-    "mining": ["segment", "reserves", "mineral resource", "production by", "net asset value", "nav"],
-    "pre_revenue_mining": ["reserves", "mineral resource", "net asset value", "nav", "exploration"],
+    "mining": [
+        "segment",
+        "reserves",
+        "mineral resource",
+        "production by",
+        "net asset value",
+        "nav",
+    ],
+    "pre_revenue_mining": [
+        "reserves",
+        "mineral resource",
+        "net asset value",
+        "nav",
+        "exploration",
+    ],
     "energy": ["segment", "production", "reserves", "barrels"],
     "general": ["segment", "business unit", "product line", "revenue breakdown"],
     "tech": ["segment", "product line", "cloud", "subscription revenue"],
@@ -85,7 +106,9 @@ def _detect_independence_regex(text: str) -> str | None:
     return None
 
 
-def _extract_targeted_window(filing_text: str, template_key: str, window: int = 1_500) -> str:
+def _extract_targeted_window(
+    filing_text: str, template_key: str, window: int = 1_500
+) -> str:
     """Find the first keyword match and return a surrounding window of text."""
     keywords = _SEARCH_KEYWORDS.get(template_key, [])
     for kw in keywords:
@@ -117,7 +140,9 @@ async def analyze(context: StructuredContext) -> dict:
         return {"independence": independence, "chart_data": {}}
 
     filing_window = (
-        _extract_targeted_window(filing_text, context.template_key) if filing_text else ""
+        _extract_targeted_window(filing_text, context.template_key)
+        if filing_text
+        else ""
     )
 
     independence_rule = (
@@ -127,7 +152,9 @@ async def analyze(context: StructuredContext) -> dict:
     )
 
     chart_schema_lines = "\n".join(
-        f"    {_FIELD_DESCRIPTIONS[f]}" for f in chart_fields if f in _FIELD_DESCRIPTIONS
+        f"    {_FIELD_DESCRIPTIONS[f]}"
+        for f in chart_fields
+        if f in _FIELD_DESCRIPTIONS
     )
     chart_block = (
         f'"chart_data": {{\n{chart_schema_lines}\n  }}'
@@ -153,18 +180,25 @@ async def analyze(context: StructuredContext) -> dict:
         f"Filing excerpt:\n{filing_window}"
     )
 
-    client = get_client()
+    client = get_groq_client()
     result: dict = {}
     try:
-        message = await client.messages.create(
-            model=CLASSIFY_MODEL,
+        response = await client.chat.completions.create(
+            model=CLASSIFY_MODEL_GROQ,
             max_tokens=512,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_content}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
         )
-        result = _parse_json(message.content[0].text.strip(), context.ticker)
+        result = _parse_json(
+            response.choices[0].message.content.strip(), context.ticker
+        )
     except Exception as exc:
-        logger.warning("analyzer LLM call failed", extra={"ticker": context.ticker, "error": str(exc)})
+        logger.warning(
+            "analyzer LLM call failed",
+            extra={"ticker": context.ticker, "error": str(exc)},
+        )
 
     final_independence = result.get("independence") or independence or "independent"
     if final_independence not in _VALID_INDEPENDENCE:
@@ -174,7 +208,11 @@ async def analyze(context: StructuredContext) -> dict:
 
     logger.info(
         "analysis complete",
-        extra={"ticker": context.ticker, "template": context.template_key, "independence": final_independence},
+        extra={
+            "ticker": context.ticker,
+            "template": context.template_key,
+            "independence": final_independence,
+        },
     )
     return {"independence": final_independence, "chart_data": chart_data}
 
@@ -187,5 +225,7 @@ def _parse_json(text: str, ticker: str) -> dict:
     try:
         return json.loads(match.group())
     except json.JSONDecodeError:
-        logger.warning("JSON parse failed in analyzer response", extra={"ticker": ticker})
+        logger.warning(
+            "JSON parse failed in analyzer response", extra={"ticker": ticker}
+        )
         return {}
